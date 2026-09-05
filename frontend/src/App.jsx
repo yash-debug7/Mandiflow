@@ -7,6 +7,7 @@ import KioskDisplay from './components/KioskDisplay';
 import OversightDashboard from './components/OversightDashboard';
 import IVRKeypadSimulator from './components/IVRKeypadSimulator';
 import { translations } from './i18n';
+import { API_BASE_URL, getWsUrl } from './config';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('farmer');
@@ -33,10 +34,10 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       const [cRes, sRes, bRes, nRes] = await Promise.all([
-        fetch('/api/centres'),
-        fetch('/api/slots'),
-        fetch('/api/bookings'),
-        fetch('/api/notifications')
+        fetch(`${API_BASE_URL}/api/centres`),
+        fetch(`${API_BASE_URL}/api/slots`),
+        fetch(`${API_BASE_URL}/api/bookings`),
+        fetch(`${API_BASE_URL}/api/notifications`)
       ]);
 
       if (cRes.ok) setCentres(await cRes.json());
@@ -52,8 +53,7 @@ export default function App() {
     loadInitialData();
 
     // WebSocket real-time subscription
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/queue`;
+    const wsUrl = getWsUrl('/ws/queue');
     
     const connectWs = () => {
       try {
@@ -105,8 +105,8 @@ export default function App() {
     const pollInterval = setInterval(async () => {
       try {
         const [bRes, nRes] = await Promise.all([
-          fetch('/api/bookings'),
-          fetch('/api/notifications')
+          fetch(`${API_BASE_URL}/api/bookings`),
+          fetch(`${API_BASE_URL}/api/notifications`)
         ]);
         if (bRes.ok) setBookings(await bRes.json());
         if (nRes.ok) setNotifications(await nRes.json());
@@ -123,7 +123,7 @@ export default function App() {
 
   const handleCallNext = async (centreId) => {
     try {
-      const res = await fetch(`/api/queue/${centreId}/call-next`, {
+      const res = await fetch(`${API_BASE_URL}/api/queue/${centreId}/call-next`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -142,7 +142,7 @@ export default function App() {
 
   const handleUpdateBooking = async () => {
     try {
-      const res = await fetch('/api/bookings');
+      const res = await fetch(`${API_BASE_URL}/api/bookings`);
       if (res.ok) setBookings(await res.json());
     } catch (e) {
       console.error(e);

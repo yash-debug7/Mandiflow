@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../i18n';
+import { API_BASE_URL } from '../config';
 import { 
   Building2, Printer, Volume2, Fingerprint, CreditCard, ShieldCheck, 
   CheckCircle2, Sparkles, AlertCircle, ArrowRight, UserCheck, RefreshCw,
@@ -129,7 +130,7 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
     if (!farmerName.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/staff-booking', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/staff-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

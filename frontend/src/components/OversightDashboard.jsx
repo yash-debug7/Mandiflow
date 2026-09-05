@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { translations } from '../i18n';
+import { API_BASE_URL } from '../config';
 import { 
   BarChart3, TrendingDown, Clock, ShieldCheck, AlertCircle, 
   Phone, MessageSquare, Smartphone, Monitor, Banknote, ArrowRight, CheckCircle2,
@@ -15,7 +16,7 @@ export default function OversightDashboard({ lang }) {
 
   const fetchOversightData = async () => {
     try {
-      const res = await fetch('/api/oversight/stats');
+      const res = await fetch(`${API_BASE_URL}/api/oversight/stats`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);
