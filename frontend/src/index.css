@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --cream: #FAF6EC;
+    --paper: #FFFFFF;
+    --charcoal: #2B2A25;
+    --charcoal-soft: #5C584E;
+    --terracotta: #C1592F;
+    --terracotta-dark: #9A431F;
+    --terracotta-tint: #F5E1D5;
+    --gold: #C68A2E;
+    --gold-tint: #F3E5C6;
+    --green: #43613B;
+    --green-tint: #E1EADD;
+    --border: #E6DFC9;
+    --danger: #A63D3D;
+    --danger-tint: #F3DEDA;
+  }
+
+  body {
+    background-color: var(--cream);
+    color: var(--charcoal);
+    font-family: 'Noto Sans', 'Noto Sans Devanagari', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces', serif;
+  }
+
+  .font-mono {
+    font-family: 'Space Mono', monospace;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF6EC;
+}
+::-webkit-scrollbar-thumb {
+  background: #E6DFC9;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5C584E;
+}
+
+/* Pulse badge */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.live-dot {
+  animation: livePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

@@ -1,0 +1,9 @@
+# MandiFlow Backend
+fastapi[standard]
+uvicorn[standard]
+python-socketio
+aiosqlite
+twilio
+httpx
+python-dotenv
+pydantic
