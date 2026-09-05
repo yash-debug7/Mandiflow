@@ -6,6 +6,7 @@ import {
   Phone, MessageSquare, Smartphone, Monitor, Banknote, ArrowRight, CheckCircle2,
   ArrowUpRight, ArrowDownRight, Target
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function OversightDashboard({ lang }) {
   const t = translations[lang];
@@ -15,7 +16,7 @@ export default function OversightDashboard({ lang }) {
 
   const fetchOversightData = async () => {
     try {
-      const res = await fetch('/api/oversight/stats');
+      const res = await fetch(`${API_BASE_URL}/api/oversight/stats`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);

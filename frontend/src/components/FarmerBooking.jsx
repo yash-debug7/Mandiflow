@@ -6,6 +6,7 @@ import {
   CheckCircle2, Clock, ArrowRight, 
   MapPin, Sparkles, QrCode, Star, Wifi, Battery, Signal
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 const CROPS = ["Wheat", "Paddy", "Onion", "Soybean", "Mustard", "Maize"];
 
@@ -49,7 +50,7 @@ export default function FarmerBooking({
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/bookings', {
+      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,7 +74,7 @@ export default function FarmerBooking({
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     try {
-      await fetch('/api/feedback', {
+      await fetch(`${API_BASE_URL}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

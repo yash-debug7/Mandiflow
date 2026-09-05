@@ -5,6 +5,7 @@ import {
   Phone, PhoneCall, PhoneOff, Volume2, VolumeX, CheckCircle, 
   Sparkles, Zap, Hash, Delete
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 // Standard DTMF Dual-Tone Frequencies (Hz)
 const DTMF_FREQS = {
@@ -86,7 +87,7 @@ export default function IVRKeypadSimulator({
     setDigitBuffer('');
     setIsTokenEntryMode(false);
     try {
-      const res = await fetch('/api/ivr/simulator/action', {
+      const res = await fetch(`${API_BASE_URL}/api/ivr/simulator/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: 'welcome', digit: null, lang: 'hi' })
@@ -116,7 +117,7 @@ export default function IVRKeypadSimulator({
 
   const sendDigitToBackend = async (digit) => {
     try {
-      const res = await fetch('/api/ivr/simulator/action', {
+      const res = await fetch(`${API_BASE_URL}/api/ivr/simulator/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: currentStep, digit, lang: ivrLang, centre_id: centreId })

@@ -106,36 +106,44 @@ export default function AdminConsole({
       gain2.connect(ctx.destination);
       osc2.start(now + 0.3);
       osc2.stop(now + 0.9);
-    } catch (e) { /* silent */ }
-  };
-
-  const triggerLoudspeakerPA = (token, farmerName, bay = 2) => {
-    playMandiChime();
-    const textHi = `ध्यान दें! टोकन नंबर ${token}, किसान ${farmerName}, कृपया तौल शेड ${bay} पर तुरंत पहुंचे।`;
-    const textEn = `Attention! Token number ${token}, Farmer ${farmerName}, please report to Weighing Bay ${bay} immediately.`;
-    setPaBanner({ token, farmerName, bay, textHi, textEn });
-
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        const uHi = new SpeechSynthesisUtterance(textHi);
-        uHi.lang = 'hi-IN';
-        uHi.rate = 0.9;
-        const uEn = new SpeechSynthesisUtterance(textEn);
-        uEn.lang = 'en-IN';
-        uEn.rate = 0.95;
-        uEn.onend = () => {
-          setTimeout(() => setPaBanner(null), 3000);
-        };
-        window.speechSynthesis.speak(uHi);
-        window.speechSynthesis.speak(uEn);
-      }, 700);
-    } else {
-      setTimeout(() => setPaBanner(null), 5000);
+    } catch (e) {
+      /* silent */
     }
   };
 
-  const handleCallNextWithPA = async (centreId) => {
+  // Play loudspeaker PA announcement in Hindi & English
+  const triggerLoudspeakerPA = (tokenNumber, farmerName, bay = 2) => {
+    playMandiChime();
+    const announcementEn = `Attention please! Token number ${tokenNumber}, ${farmerName || 'Farmer'}, please proceed to Bay ${bay} for produce inspection and grading.`;
+    const announcementHi = `ध्यान दें! टोकन नंबर ${tokenNumber}, ${farmerName || 'किसान भाई'}, कृपया तुलाई और ग्रेडिंग के लिए बे नंबर ${bay} पर पहुंचे।`;
+    
+    setPaAnnouncement(`📢 टोकन ${tokenNumber} (${farmerName || 'किसान'}): बे ${bay} पर पहुंचे`);
+    
+    if (window.speechSynthesis && !isSpeakingRef.current) {
+      isSpeakingRef.current = true;
+      window.speechSynthesis.cancel();
+      
+      const utterHi = new SpeechSynthesisUtterance(announcementHi);
+      utterHi.lang = 'hi-IN';
+      utterHi.rate = 0.9;
+      
+      const utterEn = new SpeechSynthesisUtterance(announcementEn);
+      utterEn.lang = 'en-IN';
+      utterEn.rate = 0.95;
+      
+      utterHi.onend = () => {
+        window.speechSynthesis.speak(utterEn);
+      };
+      utterEn.onend = () => {
+        isSpeakingRef.current = false;
+        setTimeout(() => setPaAnnouncement(''), 7000);
+      };
+      
+      window.speechSynthesis.speak(utterHi);
+    }
+  };
+
+  const handleCallNextClick = async (centreId) => {
     if (onCallNext) {
       const calledBooking = await onCallNext(centreId);
       if (calledBooking) {
@@ -152,7 +160,7 @@ export default function AdminConsole({
         ? `${walkInDraft.id_type.toUpperCase()}: ${walkInDraft.id_number}` 
         : (walkInDraft.farmer_phone || 'Walk-In No-Phone');
 
-      const res = await fetch('/api/admin/staff-booking', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/staff-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +206,7 @@ export default function AdminConsole({
     e.preventDefault();
     if (!gradingModal) return;
     try {
-      const res = await fetch('/api/procurement/grade', {
+      const res = await fetch(`${API_BASE_URL}/api/procurement/grade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -220,7 +228,7 @@ export default function AdminConsole({
 
   const handleDisbursePayment = async (bookingId) => {
     try {
-      const res = await fetch('/api/procurement/disburse', {
+      const res = await fetch(`${API_BASE_URL}/api/procurement/disburse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ booking_id: bookingId })
@@ -233,7 +241,7 @@ export default function AdminConsole({
 
   const togglePriority = async (booking) => {
     try {
-      await fetch(`/api/bookings/${booking.id}`, {
+      await fetch(`${API_BASE_URL}/api/bookings/${booking.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: booking.priority ? 0 : 1 })
@@ -636,7 +644,7 @@ export default function AdminConsole({
                                 </motion.button>
                                 <button
                                   onClick={async () => {
-                                    await fetch(`/api/bookings/${b.id}`, {
+                                    await fetch(`${API_BASE_URL}/api/bookings/${b.id}`, {
                                       method: 'PATCH',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({ status: 'no-show' })
@@ -665,7 +673,7 @@ export default function AdminConsole({
                             {!isCalled && !isServed && (
                               <button
                                 onClick={async () => {
-                                  await fetch(`/api/bookings/${b.id}`, {
+                                  await fetch(`${API_BASE_URL}/api/bookings/${b.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'called' })

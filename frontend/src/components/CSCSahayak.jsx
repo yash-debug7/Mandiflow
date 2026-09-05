@@ -6,6 +6,7 @@ import {
   CheckCircle2, Sparkles, AlertCircle, ArrowRight, UserCheck, RefreshCw,
   QrCode, Radio, FileText, Check, Award
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCreated }) {
   const t = translations[lang] || translations.en;
@@ -129,7 +130,7 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
     if (!farmerName.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/staff-booking', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/staff-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
