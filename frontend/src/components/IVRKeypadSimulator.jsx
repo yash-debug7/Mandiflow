@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../i18n';
 import { 
   Phone, PhoneCall, PhoneOff, Volume2, VolumeX, CheckCircle, 
-  Sparkles, Zap
+  Sparkles, Zap, Hash, Delete
 } from 'lucide-react';
 
 // Standard DTMF Dual-Tone Frequencies (Hz)
@@ -14,7 +14,12 @@ const DTMF_FREQS = {
   '*': [941, 1209], '0': [941, 1336], '#': [941, 1477],
 };
 
-export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
+export default function IVRKeypadSimulator({ 
+  lang, 
+  onIVRBookingCreated,
+  soundEnabled: propSoundEnabled,
+  setSoundEnabled: propSetSoundEnabled
+}) {
   const t = translations[lang];
 
   const [callActive, setCallActive] = useState(false);
@@ -23,10 +28,18 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
   const [centreId, setCentreId] = useState('sitapur');
   const [lcdText, setLcdText] = useState('DIAL TO START');
   const [audioPrompt, setAudioPrompt] = useState('');
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [localSoundEnabled, setLocalSoundEnabled] = useState(true);
+
+  const soundEnabled = propSoundEnabled !== undefined ? propSoundEnabled : localSoundEnabled;
+  const setSoundEnabled = propSetSoundEnabled || setLocalSoundEnabled;
+
   const [lastCreatedBooking, setLastCreatedBooking] = useState(null);
   const [activeOptions, setActiveOptions] = useState([]);
   const [pressedKey, setPressedKey] = useState(null);
+  
+  // Digit buffer for multi-digit token entry
+  const [digitBuffer, setDigitBuffer] = useState('');
+  const [isTokenEntryMode, setIsTokenEntryMode] = useState(false);
   
   const audioCtxRef = useRef(null);
 
@@ -70,6 +83,8 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
   const startCall = async () => {
     setCallActive(true);
     setLastCreatedBooking(null);
+    setDigitBuffer('');
+    setIsTokenEntryMode(false);
     try {
       const res = await fetch('/api/ivr/simulator/action', {
         method: 'POST',
@@ -94,15 +109,12 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
     setCurrentStep('welcome');
     setLcdText('CALL DISCONNECTED');
     setActiveOptions([]);
+    setDigitBuffer('');
+    setIsTokenEntryMode(false);
     if (window.speechSynthesis) window.speechSynthesis.cancel();
   };
 
-  const handleKeyPress = async (digit) => {
-    playDTMF(digit);
-    setPressedKey(digit);
-    setTimeout(() => setPressedKey(null), 150);
-    if (!callActive) return;
-
+  const sendDigitToBackend = async (digit) => {
     try {
       const res = await fetch('/api/ivr/simulator/action', {
         method: 'POST',
@@ -118,18 +130,85 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
         setAudioPrompt(data.audio_text);
         setActiveOptions(data.options || []);
         speakPrompt(data.audio_text, data.lang || ivrLang);
+        
+        // Check if next step requires token number entry
+        if (data.step === 'enter_token_status' || data.step === 'enter_token_payment') {
+          setIsTokenEntryMode(true);
+          setDigitBuffer('');
+        } else {
+          setIsTokenEntryMode(false);
+          setDigitBuffer('');
+        }
+        
         if (data.booking) {
           setLastCreatedBooking(data.booking);
           if (onIVRBookingCreated) onIVRBookingCreated(data.booking);
         }
         if (data.call_ended) {
-          setTimeout(() => setCallActive(false), 7000);
+          setTimeout(() => {
+            setCallActive(false);
+            setIsTokenEntryMode(false);
+            setDigitBuffer('');
+          }, 7000);
         }
       }
     } catch (err) {
       console.error('IVR digit error:', err);
     }
   };
+
+  const handleKeyPress = async (digit) => {
+    playDTMF(digit);
+    setPressedKey(digit);
+    setTimeout(() => setPressedKey(null), 150);
+    if (!callActive) return;
+
+    // If we're in token entry mode, accumulate digits until # is pressed
+    if (isTokenEntryMode) {
+      if (digit === '#') {
+        // Submit the accumulated digits
+        const tokenDigits = digitBuffer;
+        if (tokenDigits.length > 0) {
+          setLcdText(`Submitting Token #${tokenDigits}...`);
+          await sendDigitToBackend(tokenDigits);
+        } else {
+          setLcdText('Please enter token number first, then press #');
+        }
+        return;
+      }
+      if (digit === '*') {
+        // Clear buffer
+        setDigitBuffer('');
+        setLcdText('Buffer cleared. Enter token number, then press #');
+        return;
+      }
+      // Accumulate digit
+      const newBuf = digitBuffer + digit;
+      setDigitBuffer(newBuf);
+      setLcdText(`Entering Token: ${newBuf}_\nPress # to confirm`);
+      return;
+    }
+
+    // Normal single-digit menu navigation
+    await sendDigitToBackend(digit);
+  };
+
+  // Keyboard listener for physical keyboard entry
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!callActive) return;
+      const k = e.key;
+      if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '#'].includes(k)) {
+        handleKeyPress(k);
+      } else if (k === 'Enter') {
+        handleKeyPress('#');
+      } else if (k === 'Backspace') {
+        handleKeyPress('*');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [callActive, isTokenEntryMode, digitBuffer, currentStep, ivrLang, centreId]);
 
   const keypadKeys = [
     { k: '1', s: '' }, { k: '2', s: 'ABC' }, { k: '3', s: 'DEF' },
@@ -148,6 +227,9 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-gradient-to-r from-[#C1592F] to-[#9A431F] text-white px-2.5 py-0.5 rounded-full shadow-sm">
             Headline Differentiator
+          </span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-[#E1EADD] text-[#43613B] px-2.5 py-0.5 rounded-full">
+            No Phone? No Problem.
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-[#2B2A25] leading-tight">
@@ -177,7 +259,7 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
               1800-889-2026
             </div>
             <div className="text-[10px] text-[#D9D4C6] mt-0.5">
-              Zero-data · Telephone network · SMS confirmation
+              Zero-data · Telephone network · SMS confirmation · Works on ANY phone
             </div>
           </div>
         </div>
@@ -187,26 +269,26 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
           className="relative z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/8 hover:bg-white/15 text-xs text-[#D9D4C6] font-mono border border-white/10 cursor-pointer transition-all active:scale-95"
         >
           {soundEnabled ? <Volume2 className="w-4 h-4 text-[#C68A2E]" /> : <VolumeX className="w-4 h-4 text-[#A63D3D]" />}
-          <span>{soundEnabled ? 'ON' : 'OFF'}</span>
+          <span>{soundEnabled ? 'AUDIO ON' : 'AUDIO OFF'}</span>
         </button>
       </motion.div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left: Keypad Simulator */}
         <motion.div 
-          className="lg:col-span-5 flex justify-center"
+          className="lg:col-span-5 flex justify-center items-start"
           initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-          <div className="w-full max-w-[320px] bg-gradient-to-b from-[#1E1D19] to-[#141310] rounded-[44px] p-5 shadow-2xl border border-[#3D3A33]/50 relative">
+          <div className="w-full max-w-[290px] h-fit self-start bg-gradient-to-b from-[#1E1D19] to-[#141310] rounded-[36px] p-4 shadow-2xl border border-[#3D3A33]/70 relative">
             
-            {/* Earpiece */}
-            <div className="w-14 h-1.5 bg-[#3D3A33] rounded-full mx-auto mb-4 shadow-inner" />
+            {/* Earpiece Speaker Grille */}
+            <div className="w-12 h-1 bg-[#3D3A33] rounded-full mx-auto mb-3 shadow-inner" />
 
             {/* LCD Screen */}
-            <div className="bg-[#1a2612] text-[#9EE86F] p-4 rounded-2xl border border-[#253219] shadow-inner font-mono text-[10px] min-h-[130px] flex flex-col justify-between relative overflow-hidden">
+            <div className="bg-[#1a2612] text-[#9EE86F] p-3 rounded-2xl border border-[#253219] shadow-inner font-mono text-[10px] min-h-[110px] flex flex-col justify-between relative overflow-hidden">
               {/* Scanline effect */}
               <div className="absolute inset-0 pointer-events-none" 
                 style={{ 
@@ -224,44 +306,56 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
                 <motion.div 
                   key={lcdText}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="my-2 leading-relaxed text-[10px] break-words relative z-10"
+                  className="my-1.5 leading-tight text-[10px] break-words relative z-10 whitespace-pre-line"
                 >
                   {lcdText}
                 </motion.div>
               </AnimatePresence>
 
-              <div className="text-[9px] text-[#5C8A3F] pt-1 border-t border-[#2E4020] flex justify-between relative z-10">
+              {/* Token entry indicator */}
+              {isTokenEntryMode && (
+                <div className="text-[8px] text-[#C68A2E] pt-0.5 relative z-10 flex items-center gap-1">
+                  <Hash className="w-2.5 h-2.5" />
+                  <span>TOKEN INPUT — Enter digits + #</span>
+                </div>
+              )}
+
+              <div className="text-[8px] text-[#5C8A3F] pt-1 border-t border-[#2E4020] flex justify-between relative z-10">
                 <span>MandiFlow v1.0</span>
                 <span>{callActive ? '●REC' : 'IDLE'}</span>
               </div>
             </div>
 
-            {/* Options Hint */}
+            {/* Options Hint (Clickable shortcuts) */}
             <AnimatePresence>
               {activeOptions.length > 0 && (
                 <motion.div 
                   initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  className="my-3 px-3 py-2 bg-white/5 rounded-xl border border-white/8 text-[10px] text-[#D9D4C6] space-y-0.5 font-mono overflow-hidden"
+                  className="my-2.5 px-2 py-1 bg-white/5 rounded-xl border border-white/8 text-[9px] text-[#D9D4C6] space-y-1 font-mono overflow-hidden"
                 >
                   {activeOptions.map((opt) => (
-                    <div key={opt.key} className="flex items-center justify-between">
-                      <span className="text-[#C68A2E] font-bold">[{opt.key}]</span>
-                      <span className="text-right">{opt.label}</span>
-                    </div>
+                    <button
+                      key={opt.key}
+                      onClick={() => handleKeyPress(opt.key)}
+                      className="w-full flex items-center justify-between px-1.5 py-0.5 rounded hover:bg-white/10 active:bg-white/20 transition cursor-pointer text-left"
+                    >
+                      <span className="text-[#C68A2E] font-bold bg-[#C68A2E]/20 px-1 py-0.2 rounded text-[8px]">[{opt.key}]</span>
+                      <span className="text-right text-[#FAF6EC] text-[9px] font-medium">{opt.label}</span>
+                    </button>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
 
             {/* Call Controls */}
-            <div className="grid grid-cols-2 gap-2.5 my-3">
+            <div className="grid grid-cols-2 gap-2 my-2.5">
               <motion.button
                 onClick={startCall}
                 disabled={callActive}
                 whileTap={{ scale: 0.95 }}
-                className="py-3 rounded-2xl bg-gradient-to-b from-[#4a7340] to-[#344d2d] hover:from-[#5a8350] hover:to-[#3d5936] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-[#5C8A3F]/30"
+                className="py-2.5 rounded-xl bg-gradient-to-b from-[#4a7340] to-[#344d2d] hover:from-[#5a8350] hover:to-[#3d5936] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer shadow-md border border-[#5C8A3F]/30"
               >
-                <PhoneCall className="w-3.5 h-3.5" />
+                <PhoneCall className="w-3 h-3" />
                 <span>{t.startCall}</span>
               </motion.button>
 
@@ -269,31 +363,34 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
                 onClick={endCall}
                 disabled={!callActive}
                 whileTap={{ scale: 0.95 }}
-                className="py-3 rounded-2xl bg-gradient-to-b from-[#b34040] to-[#852f2f] hover:from-[#c04545] hover:to-[#963434] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-[#c05050]/30"
+                className="py-2.5 rounded-xl bg-gradient-to-b from-[#b34040] to-[#852f2f] hover:from-[#c04545] hover:to-[#963434] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer shadow-md border border-[#c05050]/30"
               >
-                <PhoneOff className="w-3.5 h-3.5" />
+                <PhoneOff className="w-3 h-3" />
                 <span>{t.endCall}</span>
               </motion.button>
             </div>
 
             {/* Dial Keypad */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
               {keypadKeys.map(({ k, s }) => (
                 <motion.button
                   key={k}
                   onClick={() => handleKeyPress(k)}
-                  whileTap={{ scale: 0.9 }}
-                  className={`h-[52px] rounded-2xl border transition-all flex flex-col items-center justify-center cursor-pointer ${
+                  whileTap={{ scale: 0.92 }}
+                  className={`h-[42px] rounded-xl border transition-all flex flex-col items-center justify-center cursor-pointer ${
                     pressedKey === k 
-                      ? 'bg-[#C1592F] border-[#C1592F] text-white shadow-lg shadow-[#C1592F]/20' 
-                      : 'bg-[#2B2A25] hover:bg-[#383730] border-[#3D3A33] text-white shadow-md'
+                      ? 'bg-[#C1592F] border-[#C1592F] text-white shadow-md shadow-[#C1592F]/20' 
+                      : 'bg-[#2B2A25] hover:bg-[#383730] border-[#3D3A33] text-white shadow-xs'
                   }`}
                 >
-                  <span className="font-mono text-base font-bold leading-tight text-[#FAF6EC]">{k}</span>
-                  {s && <span className="text-[8px] text-[#A6A295] font-mono leading-none tracking-wider">{s}</span>}
+                  <span className="font-mono text-sm font-bold leading-none text-[#FAF6EC]">{k}</span>
+                  {s && <span className="text-[7px] text-[#A6A295] font-mono leading-none tracking-wider mt-0.5">{s}</span>}
                 </motion.button>
               ))}
             </div>
+
+            {/* Microphone Pinhole */}
+            <div className="w-1.5 h-1.5 bg-[#3D3A33] rounded-full mx-auto mt-2.5 shadow-inner" />
 
             {/* Booking Created Banner */}
             <AnimatePresence>
@@ -302,17 +399,17 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }} 
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="mt-3 p-3 bg-gradient-to-r from-[#E1EADD] to-[#d4e3cd] rounded-2xl border border-[#43613B]/30 text-center text-[10px] text-[#2B2A25]"
+                  className="mt-2.5 p-2.5 bg-gradient-to-r from-[#E1EADD] to-[#d4e3cd] rounded-xl border border-[#43613B]/30 text-center text-[10px] text-[#2B2A25]"
                 >
                   <div className="font-bold text-[#43613B] flex items-center justify-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" />
+                    <CheckCircle className="w-3 h-3" />
                     <span>Token Created via IVR!</span>
                   </div>
-                  <div className="font-mono text-base font-bold text-[#2B2A25] mt-0.5">
+                  <div className="font-mono text-sm font-bold text-[#2B2A25] mt-0.5">
                     #{String(lastCreatedBooking.token).padStart(3, '0')}
                   </div>
-                  <div className="text-[9px] text-[#5C584E] mt-0.5">
-                    Live in Admin Queue now
+                  <div className="text-[8px] text-[#5C584E] mt-0.5">
+                    Live in Admin Queue & Gate Kiosk
                   </div>
                 </motion.div>
               )}
@@ -357,6 +454,28 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* How to use guide */}
+          <div className="bg-white rounded-3xl p-6 border border-[#E6DFC9] shadow-sm">
+            <h3 className="text-[11px] font-bold text-[#2B2A25] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-[#C1592F]" />
+              Quick Demo Guide for Evaluators
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px]">
+              <div className="p-3 rounded-xl bg-[#FAF6EC] border border-[#E6DFC9]">
+                <div className="font-bold text-[#C1592F] mb-1">📞 Book a Slot (Full Flow)</div>
+                <div className="text-[#5C584E] leading-relaxed">
+                  Click <strong>Dial Call</strong> → Press <strong>1</strong> (Hindi) or <strong>2</strong> (English) → Press <strong>1</strong> (Book Slot) → Press <strong>1-4</strong> (Centre) → Press <strong>1-4</strong> (Time Slot) → <strong>Token Created!</strong>
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-[#FAF6EC] border border-[#E6DFC9]">
+                <div className="font-bold text-[#43613B] mb-1">🔍 Check Queue Status</div>
+                <div className="text-[#5C584E] leading-relaxed">
+                  At menu → Press <strong>2</strong> → Type token number digits (e.g. <strong>1</strong>, <strong>5</strong>) → Press <strong>#</strong> to look up position and wait time.
+                </div>
+              </div>
             </div>
           </div>
 

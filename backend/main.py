@@ -244,6 +244,12 @@ async def update_booking(booking_id: int, update: BookingUpdate):
 
 # ── Queue operations ──
 
+class PAAnnouncementRequest(BaseModel):
+    token: int
+    farmer_name: str
+    bay_number: int = 2
+    language: str = "both"
+
 @app.post("/api/queue/{centre_id}/call-next")
 async def call_next(centre_id: str):
     """Call the next token in the waiting queue (priority first, then FIFO)."""
@@ -266,9 +272,44 @@ async def call_next(centre_id: str):
         await db.commit()
         booking["status"] = "called"
         await broadcast("token_called", booking)
+        
+        # Also broadcast live Mandi PA Loudspeaker announcement for no-phone farmers
+        bay_num = 2 if centre_id in ("sitapur", "karnal") else 1
+        pa_payload = {
+            "centre_id": centre_id,
+            "token": booking["token"],
+            "farmer_name": booking["farmer_name"],
+            "bay_number": bay_num,
+            "msg_hi": f"ध्यान दें! टोकन नंबर {booking['token']}, किसान {booking['farmer_name']}, कृपया तौल शेड {bay_num} पर तुरंत पहुंचे।",
+            "msg_en": f"Attention! Token number {booking['token']}, Farmer {booking['farmer_name']}, please report to Weighing Bay {bay_num} immediately.",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        await broadcast("pa_announcement", pa_payload)
+
+        # Omnichannel notification to phone if available
+        if booking.get("farmer_phone"):
+            msg = f"MandiFlow ALERT: Token #{booking['token']:03d}, your turn is now! Please proceed to Weighing Bay {bay_num} immediately."
+            await dispatch_omnichannel(booking["farmer_phone"], msg, booking["id"])
+
         return booking
     finally:
         await db.close()
+
+
+@app.post("/api/queue/{centre_id}/pa-announce")
+async def pa_announce(centre_id: str, req: PAAnnouncementRequest):
+    """Trigger Mandi Yard PA Loudspeaker Audio Announcement explicitly."""
+    pa_payload = {
+        "centre_id": centre_id,
+        "token": req.token,
+        "farmer_name": req.farmer_name,
+        "bay_number": req.bay_number,
+        "msg_hi": f"ध्यान दें! टोकन नंबर {req.token}, किसान {req.farmer_name}, कृपया तौल शेड {req.bay_number} पर पहुंचे।",
+        "msg_en": f"Attention! Token number {req.token}, Farmer {req.farmer_name}, please proceed to Weighing Bay {req.bay_number}.",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    await broadcast("pa_announcement", pa_payload)
+    return {"status": "announced", "payload": pa_payload}
 
 
 @app.get("/api/queue/{centre_id}/now-serving")

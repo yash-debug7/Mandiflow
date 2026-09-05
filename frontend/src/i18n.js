@@ -104,7 +104,28 @@ export const translations = {
     step4H: "4. Instant Token & SMS Dispatch",
     step4D: "Generates real token in backend database and pushes immediate SMS confirmation to farmer's mobile.",
     step5H: "5. Two-Tier Fail-Safe Handling",
-    step5D: "Replays menu once on invalid key; automatically routes to human field staff callback after 2 errors."
+    step5D: "Replays menu once on invalid key; automatically routes to human field staff callback after 2 errors.",
+
+    // No-Phone & CSC Sahayak Features
+    navCsc: "No-Phone Sahayak",
+    cscTitle: "Village CSC & Gate Spot Kiosk (Zero-Phone Farmer Solution)",
+    cscSub: "Full offline inclusion for farmers with neither a smartphone nor feature phone. Gram Panchayat Sahayaks & Gate Desks issue physical thermal barcode slips and broadcast token calls across the mandi yard via PA loudspeakers.",
+    idType: "Government ID / Verification Type",
+    aadhaarUID: "Aadhaar Number (UIDAI)",
+    kisanCreditCard: "Kisan Credit Card (KCC)",
+    pmKisanID: "PM-KISAN Farmer ID",
+    rationCard: "Ration Card ID",
+    biometricScan: "Biometric Thumbprint Scan",
+    printSlipBtn: "Print Physical Token Slip",
+    slipHeading: "KRISHI UPAJ MANDI SAMITI — ENTRY PASS",
+    slipSub: "Department of Food & Public Distribution · Government of India",
+    paAnnouncementTitle: "Mandi Yard Public Address (PA) Loudspeakers",
+    paAnnouncementSub: "Bilingual audio chime and broadcast across the yard so farmers without phones never miss their turn.",
+    paLiveBroadcasting: "BROADCASTING TO YARD SPEAKERS",
+    paTestChime: "Test Mandi PA Chime & Voice",
+    paBayAssigned: "Assigned Weighing Bay",
+    printThermalPass: "Print Thermal Slip",
+    noPhoneBadge: "Zero-Phone Inclusion Mode"
   },
   hi: {
     appTitle: "मंडीफ्लो",
@@ -211,6 +232,27 @@ export const translations = {
     step4H: "4. तत्काल टोकन व SMS सूचना",
     step4D: "डेटाबेस में टोकन दर्ज होते ही किसान के मोबाइल पर तुरंत एसएमएस व व्हाट्सएप सूचना प्रेषित।",
     step5H: "5. मानवीय सहायता बैकअप",
-    step5D: "गलत बटन दबाने पर मेनू दोहराव; लगातार 2 त्रुटियों पर तुरंत केंद्र स्टाफ की कॉलबैक सुविधा।"
+    step5D: "गलत बटन दबाने पर मेनू दोहराव; लगातार 2 त्रुटियों पर तुरंत केंद्र स्टाफ की कॉलबैक सुविधा।",
+
+    // No-Phone & CSC Sahayak Features
+    navCsc: "नो-फ़ोन सहायक (CSC)",
+    cscTitle: "ग्राम पंचायत CSC व मंडी गेट स्पॉट कियोस्क (बिना फ़ोन वाले किसानों हेतु)",
+    cscSub: "उन किसानों के लिए संपूर्ण ऑफलाइन समाधान जिनके पास कोई मोबाइल नहीं है। ग्राम पंचायत सहायक व गेट डेस्क द्वारा बायोमेट्रिक/आधार से सीधे भौतिक थर्मल पर्ची जारी की जाती है और मंडी लाउडस्पीकर द्वारा टोकन पुकारा जाता है।",
+    idType: "सरकारी पहचान / प्रमाणीकरण प्रकार",
+    aadhaarUID: "आधार संख्या (UIDAI)",
+    kisanCreditCard: "किसान क्रेडिट कार्ड (KCC)",
+    pmKisanID: "पीएम-किसान किसान आईडी",
+    rationCard: "राशन कार्ड आईडी",
+    biometricScan: "बायोमेट्रिक फिंगरप्रिंट स्कैन",
+    printSlipBtn: "भौतिक टोकन पर्ची प्रिंट करें",
+    slipHeading: "कृषि उपज मंडी समिति — प्रवेश पास",
+    slipSub: "खाद्य एवं सार्वजनिक वितरण विभाग · भारत सरकार",
+    paAnnouncementTitle: "मंडी यार्ड लाउडस्पीकर उद्घोषणा प्रणाली (PA)",
+    paAnnouncementSub: "घंटी ध्वनि और द्विभाषी घोषणा जिससे बिना फोन वाले किसान भी अपनी बारी कभी न चूकें।",
+    paLiveBroadcasting: "यार्ड लाउडस्पीकर पर प्रसारण जारी",
+    paTestChime: "मंडी घंटी व उद्घोषणा चलाएं",
+    paBayAssigned: "आवंटित तौल कांटा / शेड",
+    printThermalPass: "थर्मल पर्ची प्रिंट करें",
+    noPhoneBadge: "नो-फ़ोन किसान समाधान"
   }
 };

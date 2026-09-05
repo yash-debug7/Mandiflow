@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import FarmerBooking from './components/FarmerBooking';
 import AdminConsole from './components/AdminConsole';
+import CSCSahayak from './components/CSCSahayak';
 import KioskDisplay from './components/KioskDisplay';
 import OversightDashboard from './components/OversightDashboard';
 import IVRKeypadSimulator from './components/IVRKeypadSimulator';
@@ -10,6 +11,7 @@ import { translations } from './i18n';
 export default function App() {
   const [activeTab, setActiveTab] = useState('farmer');
   const [lang, setLang] = useState('en');
+  const [soundEnabled, setSoundEnabled] = useState(true);
   
   const [centres, setCentres] = useState([]);
   const [slots, setSlots] = useState([]);
@@ -20,6 +22,12 @@ export default function App() {
 
   const socketRef = useRef(null);
   const t = translations[lang];
+
+  useEffect(() => {
+    if (!soundEnabled && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, [soundEnabled]);
 
   // Fetch initial database state
   const loadInitialData = async () => {
@@ -124,10 +132,12 @@ export default function App() {
         if (myBooking && myBooking.id === called.id) {
           setMyBooking(called);
         }
+        return called; // Return so callers can use the fresh data
       }
     } catch (err) {
       console.error('Failed to call next token:', err);
     }
+    return null;
   };
 
   const handleUpdateBooking = async () => {
@@ -148,6 +158,8 @@ export default function App() {
         lang={lang}
         setLang={setLang}
         wsConnected={wsConnected}
+        soundEnabled={soundEnabled}
+        setSoundEnabled={setSoundEnabled}
       />
 
       {/* Main View Area */}
@@ -157,6 +169,7 @@ export default function App() {
             centres={centres}
             slots={slots}
             lang={lang}
+            setLang={setLang}
             bookings={bookings}
             myBooking={myBooking}
             setMyBooking={setMyBooking}
@@ -171,9 +184,22 @@ export default function App() {
             slots={slots}
             lang={lang}
             bookings={bookings}
+            soundEnabled={soundEnabled}
             onCallNext={handleCallNext}
             onUpdateBooking={handleUpdateBooking}
             onStaffBooking={handleUpdateBooking}
+          />
+        )}
+
+        {activeTab === 'csc' && (
+          <CSCSahayak
+            centres={centres}
+            slots={slots}
+            lang={lang}
+            bookings={bookings}
+            onBookingCreated={(b) => {
+              setBookings((prev) => [...prev, b]);
+            }}
           />
         )}
 
@@ -182,6 +208,8 @@ export default function App() {
             centres={centres}
             lang={lang}
             bookings={bookings}
+            soundEnabled={soundEnabled}
+            setSoundEnabled={setSoundEnabled}
           />
         )}
 
@@ -194,6 +222,8 @@ export default function App() {
         {activeTab === 'ivr' && (
           <IVRKeypadSimulator
             lang={lang}
+            soundEnabled={soundEnabled}
+            setSoundEnabled={setSoundEnabled}
             onIVRBookingCreated={(b) => {
               setBookings((prev) => [...prev, b]);
             }}

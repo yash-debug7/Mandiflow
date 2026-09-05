@@ -308,7 +308,8 @@ async def ivr_simulator_action(act: SimulatorAction):
 
     # Step: Enter Token for Queue Status
     if step == "enter_token_status":
-        token_num = int(d.replace("#", "") or "1")
+        clean_d = "".join(ch for ch in d if ch.isdigit())
+        token_num = int(clean_d) if clean_d else 1
         db = await get_db()
         try:
             rows = await db.execute_fetchall(
@@ -363,7 +364,8 @@ async def ivr_simulator_action(act: SimulatorAction):
 
     # Step: Enter Token for Payment Status
     if step == "enter_token_payment":
-        token_num = int(d.replace("#", "") or "1")
+        clean_d = "".join(ch for ch in d if ch.isdigit())
+        token_num = int(clean_d) if clean_d else 1
         db = await get_db()
         try:
             rows = await db.execute_fetchall(

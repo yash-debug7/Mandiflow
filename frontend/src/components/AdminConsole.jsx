@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../i18n';
 import { 
   Users, UserPlus, PhoneCall, CheckCircle, XCircle, AlertTriangle, 
-  Scale, Banknote, Search, Star, Smartphone, Phone, Sparkles, RefreshCw
+  Scale, Banknote, Search, Star, Smartphone, Phone, Sparkles, RefreshCw,
+  Printer, Volume2, Radio, Building2, FileText, Check, ShieldCheck, Fingerprint
 } from 'lucide-react';
 
 export default function AdminConsole({ 
@@ -15,18 +16,22 @@ export default function AdminConsole({
   onUpdateBooking, 
   onStaffBooking 
 }) {
-  const t = translations[lang];
+  const t = translations[lang] || translations.en;
 
   const [selectedCentreId, setSelectedCentreId] = useState('sitapur');
   const [filterSearch, setFilterSearch] = useState('');
+  const [activeFilterTab, setActiveFilterTab] = useState('all'); // 'all', 'waiting', 'called', 'grading', 'paid'
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [gradingModal, setGradingModal] = useState(null); // booking to grade
+  const [slipModal, setSlipModal] = useState(null); // printable thermal slip modal
 
   const [walkInDraft, setWalkInDraft] = useState({
     farmer_name: '',
     farmer_phone: '',
     crop: 'Wheat',
     slot_id: 's2',
+    id_type: 'aadhaar',
+    id_number: '',
     priority: false
   });
 
@@ -36,6 +41,9 @@ export default function AdminConsole({
     grade: 'A',
     msp_rate: 24.25
   });
+
+  const audioCtxRef = useRef(null);
+  const [paBanner, setPaBanner] = useState(null);
 
   const currentCentre = centres.find(c => c.id === selectedCentreId) || centres[0];
   const centreBookings = bookings.filter(b => b.centre_id === selectedCentreId);
@@ -51,7 +59,13 @@ export default function AdminConsole({
 
   // Filtered queue table rows
   const queueRows = centreBookings
-    .filter(b => b.status === 'waiting' || b.status === 'called' || (b.status === 'served' && b.payment_status !== 'paid'))
+    .filter(b => {
+      if (activeFilterTab === 'waiting') return b.status === 'waiting';
+      if (activeFilterTab === 'called') return b.status === 'called';
+      if (activeFilterTab === 'grading') return b.status === 'called' || (b.status === 'served' && b.payment_status !== 'paid');
+      if (activeFilterTab === 'paid') return b.payment_status === 'paid';
+      return b.status !== 'no-show';
+    })
     .filter(b => {
       if (!filterSearch) return true;
       const q = filterSearch.toLowerCase();
@@ -64,10 +78,80 @@ export default function AdminConsole({
       return a.token - b.token;
     });
 
+  const playMandiChime = () => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      
+      const now = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.frequency.setValueAtTime(587.33, now);
+      gain1.gain.setValueAtTime(0.18, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.45);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.frequency.setValueAtTime(880.0, now + 0.3);
+      gain2.gain.setValueAtTime(0.22, now + 0.3);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.3);
+      osc2.stop(now + 0.9);
+    } catch (e) { /* silent */ }
+  };
+
+  const triggerLoudspeakerPA = (token, farmerName, bay = 2) => {
+    playMandiChime();
+    const textHi = `ध्यान दें! टोकन नंबर ${token}, किसान ${farmerName}, कृपया तौल शेड ${bay} पर तुरंत पहुंचे।`;
+    const textEn = `Attention! Token number ${token}, Farmer ${farmerName}, please report to Weighing Bay ${bay} immediately.`;
+    setPaBanner({ token, farmerName, bay, textHi, textEn });
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        const uHi = new SpeechSynthesisUtterance(textHi);
+        uHi.lang = 'hi-IN';
+        uHi.rate = 0.9;
+        const uEn = new SpeechSynthesisUtterance(textEn);
+        uEn.lang = 'en-IN';
+        uEn.rate = 0.95;
+        uEn.onend = () => {
+          setTimeout(() => setPaBanner(null), 3000);
+        };
+        window.speechSynthesis.speak(uHi);
+        window.speechSynthesis.speak(uEn);
+      }, 700);
+    } else {
+      setTimeout(() => setPaBanner(null), 5000);
+    }
+  };
+
+  const handleCallNextWithPA = async (centreId) => {
+    if (onCallNext) {
+      const calledBooking = await onCallNext(centreId);
+      if (calledBooking) {
+        triggerLoudspeakerPA(calledBooking.token, calledBooking.farmer_name, 2);
+      }
+    }
+  };
+
   const handleWalkInSubmit = async (e) => {
     e.preventDefault();
     if (!walkInDraft.farmer_name.trim()) return;
     try {
+      const phoneOrId = walkInDraft.id_number 
+        ? `${walkInDraft.id_type.toUpperCase()}: ${walkInDraft.id_number}` 
+        : (walkInDraft.farmer_phone || 'Walk-In No-Phone');
+
       const res = await fetch('/api/admin/staff-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,14 +160,34 @@ export default function AdminConsole({
           crop: walkInDraft.crop,
           slot_id: walkInDraft.slot_id,
           farmer_name: walkInDraft.farmer_name,
-          farmer_phone: walkInDraft.farmer_phone,
+          farmer_phone: phoneOrId,
           priority: walkInDraft.priority ? 1 : 0
         })
       });
       if (res.ok) {
+        const newBooking = await res.json();
         setShowWalkInModal(false);
-        setWalkInDraft({ farmer_name: '', farmer_phone: '', crop: 'Wheat', slot_id: 's2', priority: false });
+        setWalkInDraft({ 
+          farmer_name: '', 
+          farmer_phone: '', 
+          crop: 'Wheat', 
+          slot_id: 's2', 
+          id_type: 'aadhaar', 
+          id_number: '', 
+          priority: false 
+        });
         if (onStaffBooking) onStaffBooking();
+        
+        // Open thermal slip modal immediately for instant print!
+        const centreObj = centres.find(c => c.id === selectedCentreId) || { name: 'Sitapur Krishi Mandi' };
+        const slotObj = slots.find(s => s.id === newBooking.slot_id) || { label: '9:00 – 11:00 AM' };
+        setSlipModal({
+          ...newBooking,
+          centre_name: centreObj.name,
+          slot_label: slotObj.label,
+          bay: 'Bay 2 (Shed C)',
+          issued_at: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        });
       }
     } catch (err) {
       console.error('Walk-in booking error:', err);
@@ -140,15 +244,27 @@ export default function AdminConsole({
     }
   };
 
+  const openSlipForBooking = (b) => {
+    const centreObj = centres.find(c => c.id === b.centre_id) || { name: 'Krishi Mandi' };
+    const slotObj = slots.find(s => s.id === b.slot_id) || { label: 'Slot S2' };
+    setSlipModal({
+      ...b,
+      centre_name: centreObj.name,
+      slot_label: slotObj.label,
+      bay: 'Bay 2 (Shed C)',
+      issued_at: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    });
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8"
+      className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6"
     >
       {/* Top Header & Centre Switcher */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-display font-extrabold text-[#2B2A25]">
@@ -161,20 +277,63 @@ export default function AdminConsole({
           <p className="text-xs text-[#5C584E] mt-1">{t.adminSub}</p>
         </div>
 
-        {/* Staff walk-in booking button */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowWalkInModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2B2A25] hover:bg-black text-white text-xs font-bold transition shadow-sm cursor-pointer self-start md:self-auto border border-[#5C584E]/40"
-        >
-          <UserPlus className="w-4 h-4 text-[#C68A2E]" />
-          <span>{t.walkInBtn}</span>
-        </motion.button>
+        {/* Action Buttons: Walk-in & PA Test */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => triggerLoudspeakerPA(nowServing ? nowServing.token : 42, nowServing ? nowServing.farmer_name : 'Ram Singh', 2)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FAF6EC] hover:bg-[#E6DFC9] text-[#2B2A25] text-xs font-bold transition shadow-xs cursor-pointer border border-[#E6DFC9]"
+          >
+            <Volume2 className="w-3.5 h-3.5 text-[#C1592F]" />
+            <span>Mandi PA Chime</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowWalkInModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2B2A25] hover:bg-black text-white text-xs font-bold transition shadow-sm cursor-pointer border border-[#5C584E]/40"
+          >
+            <UserPlus className="w-4 h-4 text-[#C68A2E]" />
+            <span>{t.walkInBtn}</span>
+          </motion.button>
+        </div>
       </div>
 
+      {/* Live PA Announcement Toast Banner */}
+      <AnimatePresence>
+        {paBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            className="p-3.5 rounded-2xl bg-gradient-to-r from-[#2B2A25] to-[#1E1D19] text-white border border-[#C68A2E]/40 shadow-lg flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#C1592F] flex items-center justify-center flex-none">
+                <Radio className="w-4 h-4 text-white animate-pulse" />
+              </div>
+              <div className="text-xs">
+                <div className="font-mono text-[10px] text-[#C68A2E] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  Mandi PA Loudspeaker Broadcasting Now
+                </div>
+                <div className="font-medium text-[#FAF6EC] mt-0.5">{paBanner.textHi}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setPaBanner(null)}
+              className="text-white/60 hover:text-white text-xs px-2 py-1"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Centre Selector Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-thin">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
         {centres.map((c) => {
           const isSel = c.id === selectedCentreId;
           const count = bookings.filter(b => b.centre_id === c.id && b.status === 'waiting').length;
@@ -209,7 +368,6 @@ export default function AdminConsole({
           <motion.div 
             className="bg-gradient-to-br from-[#2B2A25] to-[#1E1D19] text-white rounded-3xl p-6 shadow-xl border border-[#5C584E]/30 text-center relative overflow-hidden"
           >
-            {/* Background grain glow */}
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#C1592F]/20 rounded-full blur-2xl pointer-events-none" />
             <div className="text-[11px] font-mono tracking-widest text-[#C68A2E] uppercase font-bold flex items-center justify-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#C68A2E] animate-ping" />
@@ -240,17 +398,38 @@ export default function AdminConsole({
               )}
             </div>
 
-            {/* Call Next CTA */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onCallNext(selectedCentreId)}
-              disabled={waitingList.length === 0}
-              className="mt-6 w-full py-3.5 bg-gradient-to-r from-[#C1592F] to-[#9A431F] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer border border-[#C1592F]/40"
-            >
-              <PhoneCall className="w-4 h-4 text-[#FAF6EC]" />
-              <span>{t.callNextBtn}</span>
-            </motion.button>
+            {/* Action Buttons for Now Serving */}
+            <div className="mt-5 space-y-2">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleCallNextWithPA(selectedCentreId)}
+                disabled={waitingList.length === 0}
+                className="w-full py-3.5 bg-gradient-to-r from-[#C1592F] to-[#9A431F] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer border border-[#C1592F]/40"
+              >
+                <PhoneCall className="w-4 h-4 text-[#FAF6EC]" />
+                <span>{t.callNextBtn} & PA Announce</span>
+              </motion.button>
+
+              {nowServing && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setGradingModal(nowServing)}
+                    className="flex-1 py-2 rounded-xl bg-[#43613B] text-white text-xs font-bold hover:bg-[#344d2d] cursor-pointer flex items-center justify-center gap-1 shadow-sm transition"
+                  >
+                    <Scale className="w-3.5 h-3.5" />
+                    <span>Weigh & Grade</span>
+                  </button>
+                  <button
+                    onClick={() => openSlipForBooking(nowServing)}
+                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#D9D4C6] text-xs font-bold cursor-pointer flex items-center gap-1 border border-white/10 transition"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Slip</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </motion.div>
 
           {/* Quick Stats Grid */}
@@ -278,11 +457,12 @@ export default function AdminConsole({
         </div>
 
         {/* Right 2 Columns: Active Queue Dispatch Table */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#E6DFC9] shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#E6DFC9] shadow-sm space-y-4">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-[#2B2A25]">{t.todaysQueue}</h2>
-              <p className="text-[11px] text-[#5C584E]">★ marks priority produce / elderly farmer entries</p>
+              <p className="text-[11px] text-[#5C584E]">Live yard dispatch, grading, thermal slip print & DBT disbursement</p>
             </div>
 
             {/* Search Input */}
@@ -296,6 +476,29 @@ export default function AdminConsole({
                 className="pl-8 pr-3 py-1.5 text-xs rounded-xl bg-[#FAF6EC] border border-[#E6DFC9] outline-none w-full sm:w-52 focus:border-[#2B2A25] transition"
               />
             </div>
+          </div>
+
+          {/* Filter Status Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[#E6DFC9] pb-2 text-[11px]">
+            {[
+              { id: 'all', label: 'All Queue' },
+              { id: 'waiting', label: `Waiting (${waitingList.length})` },
+              { id: 'called', label: `Now Serving (${nowServing ? 1 : 0})` },
+              { id: 'grading', label: 'Weighing/Grading' },
+              { id: 'paid', label: 'DBT Settled' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveFilterTab(tab.id)}
+                className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
+                  activeFilterTab === tab.id
+                    ? 'bg-[#2B2A25] text-white shadow-xs'
+                    : 'text-[#5C584E] hover:bg-[#FAF6EC]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {/* Queue Table */}
@@ -317,7 +520,7 @@ export default function AdminConsole({
                 {queueRows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-[#5C584E] text-xs">
-                      No active tokens in queue for this centre right now.
+                      No active tokens in this view for this centre.
                     </td>
                   </tr>
                 ) : (
@@ -402,6 +605,24 @@ export default function AdminConsole({
 
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Print Slip Icon */}
+                            <button
+                              title="Print Thermal Pass Slip"
+                              onClick={() => openSlipForBooking(b)}
+                              className="p-1 rounded-lg text-[#5C584E] hover:text-[#2B2A25] hover:bg-[#FAF6EC] border border-transparent hover:border-[#E6DFC9] cursor-pointer transition"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* PA Broadcast */}
+                            <button
+                              title="Broadcast Call on Mandi PA"
+                              onClick={() => triggerLoudspeakerPA(b.token, b.farmer_name, 2)}
+                              className="p-1 rounded-lg text-[#C1592F] hover:bg-[#FAF6EC] cursor-pointer transition"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
+
                             {isCalled && (
                               <>
                                 <motion.button
@@ -450,6 +671,7 @@ export default function AdminConsole({
                                     body: JSON.stringify({ status: 'called' })
                                   });
                                   if (onUpdateBooking) onUpdateBooking();
+                                  triggerLoudspeakerPA(b.token, b.farmer_name, 2);
                                 }}
                                 className="px-2.5 py-1 rounded-lg bg-white border border-[#E6DFC9] hover:border-[#2B2A25] hover:bg-[#FAF6EC] text-[11px] font-bold text-[#2B2A25] cursor-pointer transition shadow-2xs"
                               >
@@ -469,7 +691,7 @@ export default function AdminConsole({
 
       </div>
 
-      {/* MODAL 1: Staff-Assisted Walk-in Booking */}
+      {/* MODAL 1: Staff-Assisted Walk-in Booking (with No-Phone & ID support) */}
       <AnimatePresence>
         {showWalkInModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -481,10 +703,10 @@ export default function AdminConsole({
             >
               <h3 className="text-base font-bold text-[#2B2A25] flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-[#C1592F]" />
-                <span>Staff-Assisted Walk-In Registration</span>
+                <span>Staff Walk-In & Offline Registration</span>
               </h3>
               <p className="text-xs text-[#5C584E] mt-1">
-                For farmers arriving without a smartphone or pre-booking. Staff registers them directly into the live queue.
+                For farmers arriving at the gate with or without a phone. Staff issues a live token and printed thermal barcode pass.
               </p>
 
               <form onSubmit={handleWalkInSubmit} className="space-y-4 mt-4">
@@ -500,15 +722,31 @@ export default function AdminConsole({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#2B2A25] mb-1">Mobile Number (Optional)</label>
-                  <input
-                    type="tel"
-                    placeholder="+91 98765 43210"
-                    value={walkInDraft.farmer_phone}
-                    onChange={(e) => setWalkInDraft({ ...walkInDraft, farmer_phone: e.target.value })}
-                    className="w-full text-xs p-2.5 rounded-xl border border-[#E6DFC9] outline-none focus:border-[#2B2A25]"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2B2A25] mb-1">ID Mode</label>
+                    <select
+                      value={walkInDraft.id_type}
+                      onChange={(e) => setWalkInDraft({ ...walkInDraft, id_type: e.target.value })}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[#E6DFC9] outline-none bg-white"
+                    >
+                      <option value="aadhaar">Aadhaar (UIDAI)</option>
+                      <option value="pm_kisan">PM-KISAN ID</option>
+                      <option value="kcc">Kisan Credit Card</option>
+                      <option value="phone">Mobile Number</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2B2A25] mb-1">ID / Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. XXXX 8821"
+                      value={walkInDraft.id_number}
+                      onChange={(e) => setWalkInDraft({ ...walkInDraft, id_number: e.target.value })}
+                      className="w-full text-xs p-2.5 rounded-xl border border-[#E6DFC9] outline-none focus:border-[#2B2A25]"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -558,9 +796,10 @@ export default function AdminConsole({
                   </button>
                   <button
                     type="submit"
-                    className="w-1/2 py-2.5 rounded-xl bg-[#2B2A25] text-white text-xs font-bold hover:bg-black cursor-pointer shadow-md"
+                    className="w-1/2 py-2.5 rounded-xl bg-[#2B2A25] text-white text-xs font-bold hover:bg-black cursor-pointer shadow-md flex items-center justify-center gap-1"
                   >
-                    Generate Token
+                    <Printer className="w-3.5 h-3.5 text-[#C68A2E]" />
+                    <span>Issue Token Slip</span>
                   </button>
                 </div>
               </form>
@@ -662,6 +901,103 @@ export default function AdminConsole({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: Printable Thermal Slip Pass */}
+      <AnimatePresence>
+        {slipModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#E6DFC9] text-center space-y-4"
+            >
+              <div className="flex justify-between items-center border-b border-[#E6DFC9] pb-3">
+                <span className="text-xs font-bold text-[#2B2A25] flex items-center gap-1.5">
+                  <Printer className="w-4 h-4 text-[#C1592F]" />
+                  <span>Thermal Token Slip</span>
+                </span>
+                <button
+                  onClick={() => setSlipModal(null)}
+                  className="text-xs font-bold text-[#5C584E] hover:text-black cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Thermal Pass Card */}
+              <div className="bg-[#FAFAFA] text-[#111] p-4 rounded-2xl border border-dashed border-[#888] font-mono text-center space-y-2.5">
+                <div className="text-[9px] uppercase tracking-widest text-[#666]">
+                  Krishi Upaj Mandi Samiti
+                </div>
+                <div className="text-xs font-extrabold uppercase text-[#000]">
+                  {slipModal.centre_name}
+                </div>
+
+                <div className="py-2 border-y border-dashed border-[#bbb]">
+                  <div className="text-[9px] text-[#666] uppercase">Official Entry Token</div>
+                  <div className="text-5xl font-black my-0.5 text-black">
+                    #{String(slipModal.token).padStart(3, '0')}
+                  </div>
+                  {slipModal.priority === 1 && (
+                    <div className="text-[9px] font-bold bg-[#eee] px-2 py-0.5 rounded uppercase inline-block">
+                      ★ Priority Fast-Track
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-left text-[10px] space-y-1 bg-white p-2.5 rounded-xl border border-[#eee]">
+                  <div className="flex justify-between">
+                    <span className="text-[#666]">Farmer:</span>
+                    <strong className="text-black">{slipModal.farmer_name}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#666]">Produce:</span>
+                    <strong className="text-black">{slipModal.crop}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#666]">Slot:</span>
+                    <span className="text-black">{slipModal.slot_label}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#666]">Weighing Bay:</span>
+                    <strong className="text-black">{slipModal.bay || 'Bay 2 (Shed C)'}</strong>
+                  </div>
+                </div>
+
+                {/* Simulated Barcode */}
+                <div className="h-8 bg-gradient-to-r from-black via-white to-black flex items-center justify-around opacity-80 rounded p-1">
+                  {[...Array(20)].map((_, i) => (
+                    <div key={i} className="bg-black h-6" style={{ width: `${(i % 3 === 0 ? 3 : 1.5)}px` }} />
+                  ))}
+                </div>
+
+                <div className="text-[8px] text-[#555] leading-tight">
+                  📢 Listen for loudspeaker audio announcement when your token is called.
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSlipModal(null)}
+                  className="w-1/2 py-2.5 rounded-xl border border-[#E6DFC9] text-xs font-bold text-[#5C584E] hover:bg-[#FAF6EC] cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-1/2 py-2.5 rounded-xl bg-[#2B2A25] text-white text-xs font-bold hover:bg-black cursor-pointer shadow-md flex items-center justify-center gap-1"
+                >
+                  <Printer className="w-3.5 h-3.5 text-[#C68A2E]" />
+                  <span>Print Slip</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

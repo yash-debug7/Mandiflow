@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
 import { translations } from '../i18n';
-import { Phone, Users, Monitor, BarChart3, Smartphone } from 'lucide-react';
+import { Phone, Users, Monitor, BarChart3, Smartphone, Building2, Volume2, VolumeX } from 'lucide-react';
 
-export default function Header({ activeTab, setActiveTab, lang, setLang, wsConnected }) {
-  const t = translations[lang];
+export default function Header({ 
+  activeTab, 
+  setActiveTab, 
+  lang, 
+  setLang, 
+  wsConnected,
+  soundEnabled = true,
+  setSoundEnabled
+}) {
+  const t = translations[lang] || translations.en;
   const [hoveredTab, setHoveredTab] = useState(null);
 
   const navItems = [
     { id: 'farmer', label: t.navFarmer, icon: Smartphone },
     { id: 'admin', label: t.navAdmin, icon: Users },
+    { id: 'csc', label: t.navCsc || 'No-Phone Sahayak', icon: Building2, badge: 'No-Phone' },
     { id: 'kiosk', label: t.navKiosk, icon: Monitor },
     { id: 'oversight', label: t.navOversight, icon: BarChart3 },
     { id: 'ivr', label: t.navIVR, icon: Phone, badge: 'IVR' },
@@ -44,7 +53,7 @@ export default function Header({ activeTab, setActiveTab, lang, setLang, wsConne
               </div>
             </div>
 
-            {/* Mobile Lang + Live Dot */}
+            {/* Mobile Lang + Live Dot + Mute */}
             <div className="flex items-center gap-2 md:hidden">
               <div className="flex items-center gap-1.5 px-2.5 py-1 glass-card rounded-full text-[11px] font-mono">
                 <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500 live-dot' : 'bg-amber-500'}`}></span>
@@ -56,6 +65,19 @@ export default function Header({ activeTab, setActiveTab, lang, setLang, wsConne
               >
                 {lang === 'en' ? 'हिं' : 'EN'}
               </button>
+              {setSoundEnabled && (
+                <button
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  title={soundEnabled ? "Mute All Sound" : "Unmute All Sound"}
+                  className={`p-1.5 rounded-full border transition-all active:scale-95 cursor-pointer ${
+                    soundEnabled 
+                      ? 'glass-card text-[#43613B] border-[#E6DFC9]' 
+                      : 'bg-[#F3DEDA] text-[#A63D3D] border-[#A63D3D]/30'
+                  }`}
+                >
+                  {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
           </div>
 
@@ -119,6 +141,31 @@ export default function Header({ activeTab, setActiveTab, lang, setLang, wsConne
                 हिंदी
               </button>
             </div>
+
+            {/* Mute / Sound toggle directly to the right of Hindi */}
+            {setSoundEnabled && (
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                title={soundEnabled ? "Mute All PA Audio & Chimes" : "Unmute All PA Audio & Chimes"}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer transition-all duration-200 border active:scale-95 shadow-2xs ${
+                  soundEnabled 
+                    ? 'glass-card text-[#43613B] border-[#E6DFC9] hover:bg-white hover:border-[#43613B]/40' 
+                    : 'bg-[#F3DEDA] text-[#A63D3D] border-[#A63D3D]/40 hover:bg-[#ebd0cb]'
+                }`}
+              >
+                {soundEnabled ? (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5 text-[#43613B]" />
+                    <span className="text-[10px] font-bold">MUTE</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5 text-[#A63D3D]" />
+                    <span className="text-[10px] font-bold">MUTED</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
         </div>
