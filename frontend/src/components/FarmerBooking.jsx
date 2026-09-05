@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../i18n';
 import { QRCodeSVG } from 'qrcode.react';
-import { API_BASE_URL } from '../config';
 import { 
   CheckCircle2, Clock, ArrowRight, 
   MapPin, Sparkles, QrCode, Star, Wifi, Battery, Signal
@@ -50,7 +49,7 @@ export default function FarmerBooking({
     }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
+      const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +73,7 @@ export default function FarmerBooking({
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     try {
-      await fetch(`${API_BASE_URL}/api/feedback`, {
+      await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
