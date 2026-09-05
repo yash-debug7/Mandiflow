@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MandiFlow — Farmer Procurement Slot, Queue & Status Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FAF6EC;
+    --paper:#FFFFFF;
+    --charcoal:#2B2A25;
+    --charcoal-soft:#5C584E;
+    --terracotta:#C1592F;
+    --terracotta-dark:#9A431F;
+    --terracotta-tint:#F5E1D5;
+    --gold:#C68A2E;
+    --gold-tint:#F3E5C6;
+    --green:#43613B;
+    --green-tint:#E1EADD;
+    --border:#E6DFC9;
+    --danger:#A63D3D;
+    --danger-tint:#F3DEDA;
+    --shadow: 0 1px 2px rgba(43,42,37,.06), 0 8px 24px rgba(43,42,37,.07);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--charcoal);
+    font-family:'Noto Sans','Noto Sans Devanagari',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{font-family:'Space Mono',monospace;}
+  button{font-family:inherit;}
+  .hidden{display:none !important;}
+
+  /* ---------- Top shell ---------- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px 4px 18px;flex-wrap:wrap;gap:14px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;}
+  .brand svg{flex:none;}
+  .brand-text{line-height:1.15;}
+  .brand-text .name{font-weight:800;font-size:20px;letter-spacing:.2px;}
+  .brand-text .sub{font-size:12.5px;color:var(--charcoal-soft);}
+
+  .tabs{
+    display:flex;gap:4px;background:var(--paper);border:1px solid var(--border);
+    border-radius:999px;padding:4px;box-shadow:var(--shadow);
+  }
+  .tab{
+    border:none;background:transparent;padding:9px 16px;border-radius:999px;
+    font-size:13.5px;font-weight:600;color:var(--charcoal-soft);cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .tab.active{background:var(--charcoal);color:#fff;}
+  .tab:not(.active):hover{background:var(--cream);color:var(--charcoal);}
+
+  .view{padding-top:6px;}
+
+  /* ---------- Section headers ---------- */
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:8px 0 18px;flex-wrap:wrap;}
+  .section-head h1{font-size:24px;margin:0 0 4px;}
+  .section-head p{margin:0;color:var(--charcoal-soft);font-size:14px;}
+
+  /* ================= FARMER VIEW (phone frame) ================= */
+  .farmer-wrap{display:flex;justify-content:center;padding:10px 0 20px;}
+  .phone{
+    width:390px;max-width:100%;background:var(--paper);
+    border-radius:34px;border:10px solid var(--charcoal);
+    box-shadow:var(--shadow);overflow:hidden;position:relative;
+  }
+  .phone-notch{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:120px;height:22px;background:var(--charcoal);border-radius:0 0 14px 14px;z-index:5;
+  }
+  .phone-screen{padding:34px 20px 22px;min-height:560px;}
+  .lang-toggle{
+    position:absolute;top:14px;right:16px;z-index:6;
+    display:flex;background:var(--cream);border:1px solid var(--border);border-radius:999px;padding:2px;
+  }
+  .lang-toggle button{
+    border:none;background:transparent;padding:5px 10px;border-radius:999px;font-size:11.5px;
+    font-weight:700;cursor:pointer;color:var(--charcoal-soft);
+  }
+  .lang-toggle button.active{background:var(--charcoal);color:#fff;}
+
+  .app-title{font-size:19px;font-weight:800;margin:2px 0 2px;}
+  .app-tagline{font-size:13px;color:var(--charcoal-soft);margin:0 0 20px;}
+
+  .field-label{font-size:12.5px;font-weight:700;color:var(--charcoal-soft);margin:18px 0 8px;text-transform:none;}
+  .chip-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip-btn{
+    border:1.5px solid var(--border);background:var(--paper);border-radius:14px;
+    padding:12px 14px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;
+    min-width:104px;transition:border-color .15s, background .15s;
+  }
+  .chip-btn small{display:block;font-weight:500;color:var(--charcoal-soft);font-size:11.5px;margin-top:3px;}
+  .chip-btn:hover{border-color:var(--terracotta);}
+  .chip-btn.selected{border-color:var(--terracotta);background:var(--terracotta-tint);}
+  .chip-btn.full{opacity:.45;cursor:not-allowed;}
+  .chip-btn.full:hover{border-color:var(--border);}
+
+  .centre-card{
+    border:1.5px solid var(--border);border-radius:16px;padding:14px 14px;margin-bottom:10px;
+    cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .centre-card:hover{border-color:var(--terracotta);}
+  .centre-card.selected{border-color:var(--terracotta);background:var(--terracotta-tint);}
+  .centre-card .row1{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .centre-card .cname{font-weight:700;font-size:14.5px;}
+  .centre-card .cplace{font-size:12px;color:var(--charcoal-soft);margin-top:2px;}
+  .load-pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .load-low{background:var(--green-tint);color:var(--green);}
+  .load-med{background:var(--gold-tint);color:#8a6018;}
+  .load-high{background:var(--danger-tint);color:var(--danger);}
+
+  .suggest-box{
+    margin-top:10px;background:var(--gold-tint);border-radius:14px;padding:12px 14px;font-size:12.5px;color:#6d4c14;
+  }
+
+  .primary-btn{
+    width:100%;background:var(--terracotta);color:#fff;border:none;border-radius:14px;
+    padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-top:22px;
+    transition:background .15s;
+  }
+  .primary-btn:hover{background:var(--terracotta-dark);}
+  .primary-btn:disabled{background:#D8D2C2;cursor:not-allowed;}
+  .ghost-btn{
+    width:100%;background:transparent;color:var(--charcoal);border:1.5px solid var(--border);
+    border-radius:14px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;
+  }
+  .ghost-btn:hover{border-color:var(--charcoal);}
+
+  /* Farmer live status */
+  .token-hero{
+    background:var(--charcoal);color:#fff;border-radius:20px;padding:22px 20px;text-align:center;margin-bottom:16px;
+  }
+  .token-hero .tk-label{font-size:11.5px;letter-spacing:.4px;color:#D9D4C6;margin-bottom:8px;}
+  .token-hero .tk-num{font-family:'Space Mono',monospace;font-size:46px;font-weight:700;line-height:1;}
+  .token-hero .tk-meta{font-size:12.5px;color:#C9C4B4;margin-top:10px;}
+
+  .stat-row{display:flex;gap:10px;margin-bottom:16px;}
+  .stat-box{flex:1;background:var(--cream);border-radius:14px;padding:12px 12px;text-align:center;}
+  .stat-box .v{font-family:'Space Mono',monospace;font-weight:700;font-size:20px;}
+  .stat-box .l{font-size:11px;color:var(--charcoal-soft);margin-top:3px;}
+
+  .queue-strip{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:10px 2px 16px;}
+  .qchip{
+    flex:none;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:11px;font-weight:700;border:1.5px solid var(--border);color:var(--charcoal-soft);
+  }
+  .qchip.serving{background:var(--terracotta);color:#fff;border-color:var(--terracotta);}
+  .qchip.you{background:var(--charcoal);color:#fff;border-color:var(--charcoal);}
+  .qchip.done{background:var(--green-tint);color:var(--green);border-color:var(--green-tint);}
+
+  .status-steps{margin:6px 0 18px;}
+  .step{display:flex;gap:10px;padding:8px 0;}
+  .step .dot{width:20px;height:20px;border-radius:50%;background:var(--border);flex:none;margin-top:1px;position:relative;}
+  .step.done .dot{background:var(--green);}
+  .step.current .dot{background:var(--terracotta);}
+  .step .dot::after{content:"";}
+  .step .txt{font-size:13.5px;}
+  .step .txt .t1{font-weight:700;}
+  .step .txt .t2{font-size:11.5px;color:var(--charcoal-soft);}
+  .step-line{width:2px;background:var(--border);margin-left:9px;height:14px;}
+  .step.done + .step-line, .step-line.done{background:var(--green);}
+
+  .sms-log{background:var(--cream);border-radius:16px;padding:12px 14px;margin-top:6px;}
+  .sms-item{background:var(--paper);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:12.5px;}
+  .sms-item:last-child{margin-bottom:0;}
+  .sms-item .sms-time{color:var(--charcoal-soft);font-size:10.5px;margin-top:4px;}
+
+  /* ================= ADMIN / OVERSIGHT (wide) ================= */
+  .panel{background:var(--paper);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow);}
+  .grid-2{display:grid;grid-template-columns:1.1fr 1.6fr;gap:18px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media(max-width:920px){.grid-2{grid-template-columns:1fr;} .grid-3{grid-template-columns:1fr 1fr;} .grid-4{grid-template-columns:1fr 1fr;}}
+
+  .centre-select{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .centre-select button{
+    border:1.5px solid var(--border);background:var(--paper);border-radius:10px;padding:8px 14px;
+    font-size:13px;font-weight:600;cursor:pointer;color:var(--charcoal-soft);
+  }
+  .centre-select button.active{border-color:var(--charcoal);background:var(--charcoal);color:#fff;}
+
+  .now-serving-card{background:var(--charcoal);color:#fff;border-radius:16px;padding:22px;text-align:center;}
+  .now-serving-card .lbl{font-size:11.5px;color:#D9D4C6;margin-bottom:6px;}
+  .now-serving-card .num{font-family:'Space Mono',monospace;font-size:52px;font-weight:700;line-height:1;}
+  .now-serving-card .who{font-size:13px;color:#D9D4C6;margin-top:8px;}
+  .call-next-btn{
+    margin-top:16px;width:100%;background:var(--terracotta);color:#fff;border:none;border-radius:10px;
+    padding:12px;font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .call-next-btn:hover{background:var(--terracotta-dark);}
+  .call-next-btn:disabled{background:#6b675e;cursor:not-allowed;}
+
+  .mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .mini-stat{background:var(--cream);border-radius:12px;padding:10px 12px;}
+  .mini-stat .v{font-family:'Space Mono',monospace;font-weight:700;font-size:18px;}
+  .mini-stat .l{font-size:11px;color:var(--charcoal-soft);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--charcoal-soft);
+     border-bottom:1px solid var(--border);padding:8px 8px;font-weight:700;}
+  td{padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .tok-badge{font-family:'Space Mono',monospace;font-weight:700;background:var(--cream);border-radius:8px;padding:3px 8px;display:inline-block;}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block;}
+  .badge.waiting{background:var(--gold-tint);color:#8a6018;}
+  .badge.called{background:var(--terracotta-tint);color:var(--terracotta-dark);}
+  .badge.served{background:var(--green-tint);color:var(--green);}
+  .badge.noshow{background:var(--danger-tint);color:var(--danger);}
+  .badge.pending{background:var(--gold-tint);color:#8a6018;}
+  .badge.processing{background:#e5e1f2;color:#4c3d80;}
+  .badge.paid{background:var(--green-tint);color:var(--green);}
+  .star-flag{cursor:pointer;font-size:15px;border:none;background:transparent;color:var(--border);}
+  .star-flag.on{color:var(--gold);}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .mini-btn{
+    border:1px solid var(--border);background:var(--paper);border-radius:7px;padding:5px 9px;
+    font-size:11.5px;font-weight:600;cursor:pointer;color:var(--charcoal);
+  }
+  .mini-btn:hover{border-color:var(--charcoal);}
+  .mini-btn.primary{background:var(--charcoal);color:#fff;border-color:var(--charcoal);}
+  .mini-btn.green{background:var(--green);color:#fff;border-color:var(--green);}
+  .mini-btn.danger{color:var(--danger);}
+  .empty-note{color:var(--charcoal-soft);font-size:13px;padding:14px 4px;}
+
+  /* ================= KIOSK ================= */
+  .kiosk{
+    background:var(--charcoal);color:#fff;border-radius:20px;padding:40px;min-height:520px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    position:relative;overflow:hidden;
+  }
+  .kiosk .kiosk-centre{font-size:15px;color:#D9D4C6;letter-spacing:.3px;margin-bottom:6px;}
+  .kiosk .kiosk-lbl{font-size:16px;color:#D9D4C6;margin-bottom:10px;}
+  .kiosk .kiosk-num{font-family:'Space Mono',monospace;font-weight:700;font-size:150px;line-height:1;color:var(--terracotta);}
+  .kiosk .kiosk-sub{font-size:15px;color:#D9D4C6;margin-top:18px;}
+  .kiosk-strip{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap;justify-content:center;}
+  .kiosk-strip .kchip{
+    font-family:'Space Mono',monospace;font-weight:700;font-size:20px;border:2px solid #55524A;
+    border-radius:12px;padding:8px 16px;color:#D9D4C6;
+  }
+  .kiosk-select{margin-bottom:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+
+  /* ================= OVERSIGHT ================= */
+  .stat-card{background:var(--paper);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow);}
+  .stat-card .big{font-family:'Space Mono',monospace;font-weight:700;font-size:30px;}
+  .stat-card .lbl{font-size:12.5px;color:var(--charcoal-soft);margin-top:4px;}
+  .stat-card .delta{font-size:11.5px;font-weight:700;margin-top:8px;display:inline-block;padding:2px 8px;border-radius:999px;}
+  .delta.good{background:var(--green-tint);color:var(--green);}
+  .delta.bad{background:var(--danger-tint);color:var(--danger);}
+
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .bar-row .b-label{width:170px;font-size:13px;font-weight:600;flex:none;}
+  .bar-track{flex:1;height:10px;background:var(--cream);border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:6px;}
+  .bar-row .b-val{width:70px;text-align:right;font-family:'Space Mono',monospace;font-size:12.5px;flex:none;}
+
+  .trend-wrap{padding:6px 4px 0;}
+  .trend-caption{font-size:12px;color:var(--charcoal-soft);margin-top:8px;}
+
+  .before-after{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px;}
+  .ba-card{border-radius:14px;padding:16px;}
+  .ba-card.before{background:var(--danger-tint);}
+  .ba-card.after{background:var(--green-tint);}
+  .ba-card .ba-h{font-size:11.5px;font-weight:700;letter-spacing:.3px;margin-bottom:6px;}
+  .ba-card.before .ba-h{color:var(--danger);}
+  .ba-card.after .ba-h{color:var(--green);}
+  .ba-card .ba-v{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;}
+  .ba-card .ba-d{font-size:12.5px;color:var(--charcoal-soft);margin-top:4px;}
+
+  .footer-note{text-align:center;color:var(--charcoal-soft);font-size:12px;margin-top:36px;padding-top:18px;border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+        <rect width="34" height="34" rx="9" fill="#2B2A25"/>
+        <path d="M9 22c2-6 3-10 8-13 5 3 6 7 8 13" stroke="#C1592F" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="17" cy="9" r="2.3" fill="#C68A2E"/>
+      </svg>
+      <div class="brand-text">
+        <div class="name">MandiFlow</div>
+        <div class="sub">SIH26032 · Farmer Procurement Slot, Queue &amp; Status Platform</div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-view="farmer">Farmer App</button>
+      <button class="tab" data-view="admin">Admin Console</button>
+      <button class="tab" data-view="kiosk">Kiosk Display</button>
+      <button class="tab" data-view="oversight">Ministry Oversight</button>
+    </div>
+  </div>
+
+  <!-- ================= FARMER VIEW ================= -->
+  <section id="view-farmer" class="view">
+    <div class="section-head">
+      <div>
+        <h1>Farmer app</h1>
+        <p>What a farmer sees on their own phone — book a slot, then track the live queue.</p>
+      </div>
+    </div>
+
+    <div class="farmer-wrap">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="lang-toggle">
+          <button data-lang="en" class="active">EN</button>
+          <button data-lang="hi">हिं</button>
+        </div>
+        <div class="phone-screen" id="farmer-screen"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ADMIN VIEW ================= -->
+  <section id="view-admin" class="view hidden">
+    <div class="section-head">
+      <div>
+        <h1>Procurement-centre console</h1>
+        <p>What centre staff see — run the queue, log arrivals, update procurement &amp; payment status.</p>
+      </div>
+    </div>
+
+    <div class="centre-select" id="admin-centre-select"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="now-serving-card">
+          <div class="lbl">Now serving</div>
+          <div class="num" id="admin-serving-num">—</div>
+          <div class="who" id="admin-serving-who">No one called yet</div>
+          <button class="call-next-btn" id="admin-call-next">Call next token</button>
+        </div>
+        <div class="mini-stats">
+          <div class="mini-stat"><div class="v" id="admin-waiting-count">0</div><div class="l">waiting in queue</div></div>
+          <div class="mini-stat"><div class="v" id="admin-avg-wait">0 min</div><div class="l">avg. current wait</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <strong style="font-size:14.5px;">Today's queue</strong>
+          <span style="font-size:12px;color:var(--charcoal-soft);">★ = priority (elderly / long-distance / perishable)</span>
+        </div>
+        <div style="max-height:400px;overflow:auto;">
+          <table>
+            <thead><tr>
+              <th>Token</th><th>Farmer</th><th>Crop</th><th>Slot</th><th></th><th>Status</th><th>Payment</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="admin-queue-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= KIOSK VIEW ================= -->
+  <section id="view-kiosk" class="view hidden">
+    <div class="section-head">
+      <div>
+        <h1>Kiosk / big-screen display</h1>
+        <p>A TV at the procurement-centre gate — no login needed, visible from across the yard.</p>
+      </div>
+    </div>
+    <div class="kiosk-select" id="kiosk-centre-select"></div>
+    <div class="kiosk">
+      <div class="kiosk-centre" id="kiosk-centre-name">—</div>
+      <div class="kiosk-lbl">NOW SERVING</div>
+      <div class="kiosk-num" id="kiosk-num">—</div>
+      <div class="kiosk-sub" id="kiosk-sub">Waiting for the first token to be called</div>
+      <div class="kiosk-strip" id="kiosk-upnext"></div>
+    </div>
+  </section>
+
+  <!-- ================= OVERSIGHT VIEW ================= -->
+  <section id="view-oversight" class="view hidden">
+    <div class="section-head">
+      <div>
+        <h1>Ministry oversight dashboard</h1>
+        <p>Cross-centre view for Consumer Affairs, Food &amp; Public Distribution — congestion, not just one farmer's convenience.</p>
+      </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:18px;">
+      <div class="stat-card">
+        <div class="big" id="ov-total-bookings">0</div>
+        <div class="lbl">Bookings today, all centres</div>
+      </div>
+      <div class="stat-card">
+        <div class="big" id="ov-avg-wait">0 min</div>
+        <div class="lbl">Average wait time</div>
+        <span class="delta good">↓ 61% vs walk-in baseline</span>
+      </div>
+      <div class="stat-card">
+        <div class="big" id="ov-noshow">0%</div>
+        <div class="lbl">No-show rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="big" id="ov-paid">0%</div>
+        <div class="lbl">Payments settled same day</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <strong style="font-size:14.5px;">Congestion by centre (today)</strong>
+        <div style="margin-top:16px;" id="ov-bars"></div>
+      </div>
+
+      <div class="panel">
+        <strong style="font-size:14.5px;">Average wait time, last 7 days</strong>
+        <div class="trend-wrap"><svg id="ov-trend" width="100%" height="150" viewBox="0 0 480 150"></svg></div>
+        <div class="trend-caption">Wait time trends down as slot-booking adoption replaces walk-ins.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <strong style="font-size:14.5px;">Before MandiFlow vs. after</strong>
+      <div class="before-after">
+        <div class="ba-card before">
+          <div class="ba-h">BEFORE — unmanaged walk-in</div>
+          <div class="ba-v">3.5–5 hrs</div>
+          <div class="ba-d">Typical wait, no visibility, farmers queue from before sunrise or give up and sell to middlemen.</div>
+        </div>
+        <div class="ba-card after">
+          <div class="ba-h">AFTER — booked slots + live queue</div>
+          <div class="ba-v">~40 min</div>
+          <div class="ba-d">Farmer arrives near their slot time, tracks position on phone or via SMS, knows exactly when to be there.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">MandiFlow prototype for SIH26032 · Ministry of Consumer Affairs, Food &amp; Public Distribution · Theme: Smart Automation · All data on this page is simulated for demo purposes</div>
+</div>
+
+<script>
+(function(){
+
+// ---------------------------------------------------------------
+// I18N (Farmer view only)
+// ---------------------------------------------------------------
+const I18N = {
+  en: {
+    appTitle: "MandiFlow", tagline: "Book your slot. Skip the wait.",
+    chooseCentre: "Choose a procurement centre", chooseCrop: "Select your crop",
+    chooseSlot: "Pick a time slot", confirm: "Confirm booking",
+    bookedFor: "for", newBooking: "Book a new slot",
+    yourToken: "Your token", nowServingLbl: "Now serving",
+    estWait: "Estimated wait", position: "Queue position",
+    min: "min", statusTitle: "Procurement & payment status",
+    smsTitle: "Notifications (SMS + app)",
+    stBooked: "Slot booked", stArrived: "Arrived at centre",
+    stReceived: "Produce received & graded", stPay: "Payment processing", stPaid: "Payment done",
+    full: "Full", seats: "seats left", suggest: "is less busy for this slot — shorter wait if you switch.",
+  },
+  hi: {
+    appTitle: "मंडीफ्लो", tagline: "अपना समय बुक करें। इंतज़ार से बचें।",
+    chooseCentre: "खरीद केंद्र चुनें", chooseCrop: "अपनी फसल चुनें",
+    chooseSlot: "समय स्लॉट चुनें", confirm: "बुकिंग की पुष्टि करें",
+    bookedFor: "के लिए", newBooking: "नया स्लॉट बुक करें",
+    yourToken: "आपका टोकन", nowServingLbl: "अभी सेवा में",
+    estWait: "अनुमानित प्रतीक्षा", position: "कतार में स्थान",
+    min: "मिनट", statusTitle: "खरीद व भुगतान की स्थिति",
+    smsTitle: "सूचनाएं (SMS + ऐप)",
+    stBooked: "स्लॉट बुक हुआ", stArrived: "केंद्र पर पहुंचे",
+    stReceived: "उपज प्राप्त व ग्रेड हुई", stPay: "भुगतान प्रक्रिया में", stPaid: "भुगतान हो गया",
+    full: "पूर्ण", seats: "सीटें बाकी", suggest: "इस समय कम व्यस्त है — बदलने पर कम इंतज़ार होगा।",
+  }
+};
+let lang = "en";
+function t(key){ return I18N[lang][key]; }
+
+// ---------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------
+const CENTRES = [
+  {id:"sitapur", name:"Sitapur Krishi Mandi", place:"Sitapur, Uttar Pradesh", crop:"Wheat", cap:30},
+  {id:"karnal",  name:"Karnal Procurement Centre", place:"Karnal, Haryana", crop:"Wheat", cap:25},
+  {id:"nashik",  name:"Nashik Mandi Yard", place:"Nashik, Maharashtra", crop:"Onion", cap:20},
+  {id:"kota",    name:"Kota Grain Market", place:"Kota, Rajasthan", crop:"Soybean", cap:22},
+];
+const CROPS = ["Wheat","Paddy","Onion","Soybean","Mustard","Maize"];
+const SLOTS = [
+  {id:"s1", label:"7:00 – 9:00 AM"},
+  {id:"s2", label:"9:00 – 11:00 AM"},
+  {id:"s3", label:"11:00 AM – 1:00 PM"},
+  {id:"s4", label:"2:00 – 4:00 PM"},
+];
+const SERVICE_MIN = 7; // avg minutes to serve one token, for wait estimates
+
+const FARMER_NAMES = ["Ramesh Yadav","Suman Devi","Aarti Kumari","Vikram Singh","Prakash Rao","Geeta Sharma",
+  "Naresh Patel","Kavita Meena","Om Prakash","Sunita Bai","Devendra Kumar","Lakshmi Reddy","Bhagwan Das","Shanti Devi"];
+
+let bookings = []; // {token, centre, crop, slot, farmer, priority, status, qty, grade, payment, ts}
+let tokenCounters = {}; CENTRES.forEach(c=>tokenCounters[c.id]=0);
+
+function nextToken(centreId){
+  tokenCounters[centreId] += 1;
+  return tokenCounters[centreId];
+}
+
+function seed(){
+  const statuses = ["served","served","served","no-show","served"];
+  CENTRES.forEach(c=>{
+    const n = 6 + Math.floor(Math.random()*4);
+    for(let i=0;i<n;i++){
+      const tok = nextToken(c.id);
+      const st = statuses[Math.floor(Math.random()*statuses.length)];
+      bookings.push({
+        token: tok, centre: c.id, crop: c.crop,
+        slot: SLOTS[Math.floor(Math.random()*SLOTS.length)].id,
+        farmer: FARMER_NAMES[Math.floor(Math.random()*FARMER_NAMES.length)],
+        priority: Math.random()<0.15,
+        status: st,
+        qty: st==="served" ? (20+Math.floor(Math.random()*60)) : null,
+        grade: st==="served" ? ["A","A","B"][Math.floor(Math.random()*3)] : null,
+        payment: st==="served" ? ["paid","paid","processing","pending"][Math.floor(Math.random()*4)] : "—",
+        ts: Date.now() - Math.floor(Math.random()*6*3600*1000),
+      });
+    }
+    // a couple of waiting tokens per centre right now, plus one already being served
+    for(let i=0;i<4;i++){
+      const tok = nextToken(c.id);
+      bookings.push({
+        token: tok, centre: c.id, crop: c.crop,
+        slot: SLOTS[Math.floor(Math.random()*SLOTS.length)].id,
+        farmer: FARMER_NAMES[Math.floor(Math.random()*FARMER_NAMES.length)],
+        priority: Math.random()<0.2,
+        status: i===0 ? "called" : "waiting", qty:null, grade:null, payment:"—",
+        ts: Date.now(),
+      });
+    }
+  });
+}
+seed();
+
+// currently "called" (now serving) token per centre
+function nowServing(centreId){
+  return bookings.find(b=>b.centre===centreId && b.status==="called");
+}
+function waitingList(centreId){
+  return bookings.filter(b=>b.centre===centreId && b.status==="waiting")
+    .sort((a,b)=> (b.priority - a.priority) || (a.token - b.token));
+}
+
+// Farmer's own booking session
+let myBooking = null; // reference into bookings[]
+let bookingDraft = {centre:null, crop:null, slot:null};
+
+const smsLog = []; // {text, time}
+function pushSMS(text){
+  smsLog.push({text, time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})});
+}
+
+// ---------------------------------------------------------------
+// TABS
+// ---------------------------------------------------------------
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
+    document.getElementById("view-"+btn.dataset.view).classList.remove("hidden");
+    renderAll();
+  });
+});
+
+document.querySelectorAll(".lang-toggle button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    lang = btn.dataset.lang;
+    document.querySelectorAll(".lang-toggle button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    renderFarmer();
+  });
+});
+
+// ---------------------------------------------------------------
+// RENDER: FARMER VIEW
+// ---------------------------------------------------------------
+function centreLoadLabel(c){
+  const waiting = waitingList(c.id).length;
+  const pct = waiting / c.cap;
+  if(pct < 0.35) return {cls:"load-low", text:`${waiting} waiting`};
+  if(pct < 0.7) return {cls:"load-med", text:`${waiting} waiting`};
+  return {cls:"load-high", text:`${waiting} waiting`};
+}
+
+function renderFarmer(){
+  const el = document.getElementById("farmer-screen");
+
+  if(myBooking && bookings.includes(myBooking)){
+    renderFarmerStatus(el);
+    return;
+  }
+
+  // ---- Booking flow ----
+  let html = `<div class="app-title">${t('appTitle')}</div><div class="app-tagline">${t('tagline')}</div>`;
+
+  html += `<div class="field-label">${t('chooseCentre')}</div>`;
+  CENTRES.forEach(c=>{
+    const load = centreLoadLabel(c);
+    const sel = bookingDraft.centre===c.id ? "selected":"";
+    html += `<div class="centre-card ${sel}" data-centre="${c.id}">
+      <div class="row1">
+        <div><div class="cname">${c.name}</div><div class="cplace">${c.place} · ${c.crop}</div></div>
+        <span class="load-pill ${load.cls}">${load.text}</span>
+      </div>
+    </div>`;
+  });
+
+  // suggestion nudge
+  if(bookingDraft.centre){
+    const cur = CENTRES.find(c=>c.id===bookingDraft.centre);
+    const curLoad = waitingList(cur.id).length / cur.cap;
+    const better = CENTRES.filter(c=>c.id!==cur.id)
+      .map(c=>({c, load: waitingList(c.id).length/c.cap}))
+      .sort((a,b)=>a.load-b.load)[0];
+    if(better && better.load < curLoad - 0.2){
+      html += `<div class="suggest-box">💡 ${better.c.name} ${t('suggest')}</div>`;
+    }
+  }
+
+  html += `<div class="field-label">${t('chooseCrop')}</div><div class="chip-grid">`;
+  CROPS.forEach(crop=>{
+    const sel = bookingDraft.crop===crop ? "selected":"";
+    html += `<button class="chip-btn ${sel}" data-crop="${crop}">${crop}</button>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="field-label">${t('chooseSlot')}</div><div class="chip-grid">`;
+  SLOTS.forEach(s=>{
+    const capForCentre = bookingDraft.centre ? CENTRES.find(c=>c.id===bookingDraft.centre).cap : 20;
+    const used = bookingDraft.centre ? bookings.filter(b=>b.centre===bookingDraft.centre && b.slot===s.id && b.status!=="no-show").length : 0;
+    const left = Math.max(capForCentre - used, 0);
+    const full = left<=0;
+    const sel = bookingDraft.slot===s.id ? "selected":"";
+    html += `<button class="chip-btn ${sel} ${full?'full':''}" data-slot="${s.id}" ${full?'disabled':''}>
+      ${s.label}<small>${full ? t('full') : left+' '+t('seats')}</small></button>`;
+  });
+  html += `</div>`;
+
+  const canConfirm = bookingDraft.centre && bookingDraft.crop && bookingDraft.slot;
+  html += `<button class="primary-btn" id="confirm-booking" ${canConfirm?'':'disabled'}>${t('confirm')}</button>`;
+
+  el.innerHTML = html;
+
+  el.querySelectorAll("[data-centre]").forEach(node=>{
+    node.addEventListener("click", ()=>{ bookingDraft.centre = node.dataset.centre; renderFarmer(); });
+  });
+  el.querySelectorAll("[data-crop]").forEach(node=>{
+    node.addEventListener("click", ()=>{ bookingDraft.crop = node.dataset.crop; renderFarmer(); });
+  });
+  el.querySelectorAll("[data-slot]").forEach(node=>{
+    node.addEventListener("click", ()=>{ if(!node.disabled){ bookingDraft.slot = node.dataset.slot; renderFarmer(); } });
+  });
+  const confirmBtn = document.getElementById("confirm-booking");
+  if(confirmBtn){
+    confirmBtn.addEventListener("click", ()=>{
+      const c = CENTRES.find(c=>c.id===bookingDraft.centre);
+      const tok = nextToken(c.id);
+      const b = {
+        token: tok, centre: c.id, crop: bookingDraft.crop, slot: bookingDraft.slot,
+        farmer: "You (demo farmer)", priority:false, status:"waiting",
+        qty:null, grade:null, payment:"—", ts: Date.now(),
+      };
+      bookings.push(b);
+      myBooking = b;
+      const slotLabel = SLOTS.find(s=>s.id===b.slot).label;
+      smsLog.length = 0;
+      pushSMS(`${lang==='en'?'Booking confirmed':'बुकिंग की पुष्टि हो गई'}: ${c.name}, Token #${String(tok).padStart(3,'0')}, ${slotLabel}.`);
+      renderAll();
+    });
+  }
+}
+
+function estWaitFor(b){
+  if(b.status!=="waiting") return 0;
+  const wl = waitingList(b.centre);
+  const pos = wl.findIndex(x=>x.token===b.token && x.centre===b.centre);
+  return Math.max((pos+1),0) * SERVICE_MIN;
+}
+
+function renderFarmerStatus(el){
+  const b = myBooking;
+  const c = CENTRES.find(c=>c.id===b.centre);
+  const serving = nowServing(b.centre);
+  const wl = waitingList(b.centre);
+  const posIdx = wl.findIndex(x=>x.token===b.token);
+
+  let html = `<div class="app-title">${t('appTitle')}</div><div class="app-tagline">${c.name}</div>`;
+
+  html += `<div class="token-hero">
+      <div class="tk-label">${t('yourToken')}</div>
+      <div class="tk-num">#${String(b.token).padStart(3,'0')}</div>
+      <div class="tk-meta">${c.name} — ${SLOTS.find(s=>s.id===b.slot).label}</div>
+    </div>`;
+
+  const est = b.status==="waiting" ? estWaitFor(b) : 0;
+  html += `<div class="stat-row">
+      <div class="stat-box"><div class="v">${serving ? '#'+String(serving.token).padStart(3,'0') : '—'}</div><div class="l">${t('nowServingLbl')}</div></div>
+      <div class="stat-box"><div class="v">${b.status==='waiting' ? (posIdx+1) : '-'}</div><div class="l">${t('position')}</div></div>
+      <div class="stat-box"><div class="v">${b.status==='waiting' ? est+' '+t('min') : '—'}</div><div class="l">${t('estWait')}</div></div>
+    </div>`;
+
+  // queue strip visualization
+  const all = bookings.filter(x=>x.centre===b.centre && (x.status==="waiting" || x.status==="called" || (x.status==="served" && x.token>=b.token-4)))
+    .sort((x,y)=>x.token-y.token);
+  html += `<div class="queue-strip">`;
+  all.forEach(x=>{
+    let cls = "qchip";
+    if(x.token===b.token) cls += " you";
+    else if(x.status==="called") cls += " serving";
+    else if(x.status==="served") cls += " done";
+    html += `<div class="${cls}">${x.token}</div>`;
+  });
+  html += `</div>`;
+
+  // status stepper
+  const stage = {
+    "waiting":0, "called":1, "served": b.payment==="paid" ? 4 : (b.payment==="processing" ? 3 : 2), "no-show":0
+  }[b.status];
+  const steps = [t('stBooked'), t('stArrived'), t('stReceived'), t('stPay'), t('stPaid')];
+  html += `<div class="field-label">${t('statusTitle')}</div><div class="status-steps">`;
+  steps.forEach((s,i)=>{
+    const done = i < stage || (i===stage && b.status==='served' && b.payment==='paid');
+    const current = i===stage && !(b.status==='served' && b.payment==='paid');
+    html += `<div class="step ${done?'done':''} ${current?'current':''}">
+      <div class="dot"></div>
+      <div class="txt"><div class="t1">${s}</div></div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="field-label">${t('smsTitle')}</div><div class="sms-log">`;
+  if(smsLog.length===0){
+    html += `<div style="font-size:12.5px;color:var(--charcoal-soft);">—</div>`;
+  } else {
+    smsLog.slice().reverse().forEach(m=>{
+      html += `<div class="sms-item">${m.text}<div class="sms-time">${m.time}</div></div>`;
+    });
+  }
+  html += `</div>`;
+
+  html += `<button class="ghost-btn" id="new-booking-btn">${t('newBooking')}</button>`;
+
+  el.innerHTML = html;
+  const nb = document.getElementById("new-booking-btn");
+  if(nb) nb.addEventListener("click", ()=>{
+    myBooking = null; bookingDraft = {centre:null, crop:null, slot:null};
+    renderFarmer();
+  });
+}
+
+// ---------------------------------------------------------------
+// RENDER: ADMIN VIEW
+// ---------------------------------------------------------------
+let adminCentre = CENTRES[0].id;
+
+function renderAdmin(){
+  const selWrap = document.getElementById("admin-centre-select");
+  selWrap.innerHTML = CENTRES.map(c=>`<button data-c="${c.id}" class="${c.id===adminCentre?'active':''}">${c.name}</button>`).join("");
+  selWrap.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{adminCentre=b.dataset.c; renderAdmin();}));
+
+  const serving = nowServing(adminCentre);
+  document.getElementById("admin-serving-num").textContent = serving ? "#"+String(serving.token).padStart(3,'0') : "—";
+  document.getElementById("admin-serving-who").textContent = serving ? serving.farmer + (serving.priority? " ★":"") : "No one called yet";
+
+  const wl = waitingList(adminCentre);
+  document.getElementById("admin-waiting-count").textContent = wl.length;
+  document.getElementById("admin-avg-wait").textContent = (wl.length * SERVICE_MIN) + " min";
+
+  const callBtn = document.getElementById("admin-call-next");
+  callBtn.disabled = wl.length===0;
+  callBtn.onclick = ()=>{
+    const cur = nowServing(adminCentre);
+    // if someone is already being served and not resolved, treat as skipped back to waiting
+    if(cur){ /* leave as-is; staff should resolve before calling next in real flow */ }
+    const next = waitingList(adminCentre)[0];
+    if(next){
+      next.status = "called";
+      if(next.farmer.startsWith("You")){
+        pushSMS(lang==='en' ? "You're up next — please proceed to the counter." : "अब आपकी बारी है — कृपया काउंटर पर जाएं।");
+      }
+      renderAll();
+    }
+  };
+
+  const body = document.getElementById("admin-queue-body");
+  const rows = bookings.filter(b=>b.centre===adminCentre && (b.status==="waiting" || b.status==="called"))
+    .sort((a,b)=> (a.status==='called'?-1:1) - (b.status==='called'?-1:1) || (b.priority-a.priority) || (a.token-b.token));
+
+  if(rows.length===0){
+    body.innerHTML = `<tr><td colspan="8" class="empty-note">No farmers waiting at this centre right now.</td></tr>`;
+  } else {
+    body.innerHTML = rows.map(b=>{
+      const slotLabel = SLOTS.find(s=>s.id===b.slot).label;
+      let actions = "";
+      if(b.status==="called"){
+        actions = `<div class="row-actions">
+          <button class="mini-btn green" data-act="served" data-tok="${b.token}">Mark served</button>
+          <button class="mini-btn danger" data-act="noshow" data-tok="${b.token}">No-show</button>
+        </div>`;
+      } else {
+        actions = `<div class="row-actions"><button class="mini-btn" data-act="call" data-tok="${b.token}">Call now</button></div>`;
+      }
+      return `<tr>
+        <td><span class="tok-badge">#${String(b.token).padStart(3,'0')}</span></td>
+        <td>${b.farmer}</td>
+        <td>${b.crop}</td>
+        <td style="font-size:12px;color:var(--charcoal-soft);">${slotLabel}</td>
+        <td><button class="star-flag ${b.priority?'on':''}" data-act="priority" data-tok="${b.token}">★</button></td>
+        <td><span class="badge ${b.status==='called'?'called':'waiting'}">${b.status==='called'?'Now serving':'Waiting'}</span></td>
+        <td><span class="badge pending">—</span></td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // recently served (for payment workflow)
+  const served = bookings.filter(b=>b.centre===adminCentre && b.status==="served" && b.payment!=="paid")
+    .sort((a,b)=>b.ts-a.ts).slice(0,6);
+  if(served.length){
+    body.innerHTML += served.map(b=>{
+      return `<tr>
+        <td><span class="tok-badge">#${String(b.token).padStart(3,'0')}</span></td>
+        <td>${b.farmer}</td>
+        <td>${b.crop} · ${b.qty||'—'}kg · Grade ${b.grade||'—'}</td>
+        <td style="font-size:12px;color:var(--charcoal-soft);">served</td>
+        <td></td>
+        <td><span class="badge served">Served</span></td>
+        <td><span class="badge ${b.payment}">${b.payment}</span></td>
+        <td><div class="row-actions"><button class="mini-btn primary" data-act="advancepay" data-tok="${b.token}">Advance payment</button></div></td>
+      </tr>`;
+    }).join("");
+  }
+
+  body.querySelectorAll("[data-act]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const tok = parseInt(btn.dataset.tok);
+      const b = bookings.find(x=>x.centre===adminCentre && x.token===tok);
+      if(!b) return;
+      const act = btn.dataset.act;
+      if(act==="call"){ b.status="called"; }
+      if(act==="priority"){ b.priority = !b.priority; }
+      if(act==="noshow"){ b.status="no-show"; }
+      if(act==="served"){
+        b.status="served"; b.qty = 20+Math.floor(Math.random()*60); b.grade=["A","B"][Math.floor(Math.random()*2)];
+        b.payment="pending";
+        if(b.farmer.startsWith("You")){
+          pushSMS(lang==='en'
+            ? `Produce received: ${b.qty}kg, Grade ${b.grade}. Payment processing.`
+            : `उपज प्राप्त हुई: ${b.qty}किग्रा, ग्रेड ${b.grade}। भुगतान प्रक्रिया में।`);
+        }
+      }
+      if(act==="advancepay"){
+        if(b.payment==="pending") b.payment="processing";
+        else if(b.payment==="processing"){
+          b.payment="paid";
+          if(b.farmer.startsWith("You")){
+            pushSMS(lang==='en' ? "Payment completed. Thank you for using MandiFlow." : "भुगतान पूरा हुआ। मंडीफ्लो का उपयोग करने के लिए धन्यवाद।");
+          }
+        }
+      }
+      renderAll();
+    });
+  });
+}
+
+// ---------------------------------------------------------------
+// RENDER: KIOSK VIEW
+// ---------------------------------------------------------------
+let kioskCentre = CENTRES[0].id;
+function renderKiosk(){
+  const sel = document.getElementById("kiosk-centre-select");
+  sel.innerHTML = CENTRES.map(c=>`<button data-c="${c.id}" class="${c.id===kioskCentre?'active':''}">${c.name}</button>`).join("");
+  sel.querySelectorAll("button").forEach(b=>{
+    b.style.cssText = "border:1.5px solid var(--border);background:var(--paper);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;";
+    if(b.dataset.c===kioskCentre){ b.style.background="var(--charcoal)"; b.style.color="#fff"; b.style.borderColor="var(--charcoal)"; }
+    b.addEventListener("click", ()=>{kioskCentre=b.dataset.c; renderKiosk();});
+  });
+
+  const c = CENTRES.find(c=>c.id===kioskCentre);
+  const serving = nowServing(kioskCentre);
+  document.getElementById("kiosk-centre-name").textContent = c.name + " — " + c.place;
+  document.getElementById("kiosk-num").textContent = serving ? "#"+String(serving.token).padStart(3,'0') : "—";
+  document.getElementById("kiosk-sub").textContent = serving ? "Please proceed to the counter" : "Waiting for the first token to be called";
+
+  const upcoming = waitingList(kioskCentre).slice(0,6);
+  document.getElementById("kiosk-upnext").innerHTML = upcoming.length
+    ? upcoming.map(b=>`<div class="kchip">#${String(b.token).padStart(3,'0')}</div>`).join("")
+    : `<div style="color:#9c988c;font-size:13px;">No one else waiting</div>`;
+}
+
+// ---------------------------------------------------------------
+// RENDER: OVERSIGHT VIEW
+// ---------------------------------------------------------------
+function renderOversight(){
+  const total = bookings.length;
+  const served = bookings.filter(b=>b.status==="served");
+  const noshow = bookings.filter(b=>b.status==="no-show");
+  const paid = served.filter(b=>b.payment==="paid");
+  const allWaiting = bookings.filter(b=>b.status==="waiting");
+  const avgWait = allWaiting.length ? Math.round(CENTRES.reduce((s,c)=>s+waitingList(c.id).length,0)/CENTRES.length * SERVICE_MIN / 2) : 0;
+
+  document.getElementById("ov-total-bookings").textContent = total;
+  document.getElementById("ov-avg-wait").textContent = (avgWait||18) + " min";
+  document.getElementById("ov-noshow").textContent = total ? Math.round(noshow.length/total*100)+"%" : "0%";
+  document.getElementById("ov-paid").textContent = served.length ? Math.round(paid.length/served.length*100)+"%" : "0%";
+
+  // congestion bars
+  const barColors = ["#C1592F","#C68A2E","#43613B","#8a6db5"];
+  const barsHtml = CENTRES.map((c,i)=>{
+    const w = waitingList(c.id).length;
+    const pct = Math.min(w / c.cap, 1);
+    return `<div class="bar-row">
+      <div class="b-label">${c.name.split(' ')[0]} ${c.name.includes('Karnal')?'':''}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(pct*100,4)}%;background:${barColors[i%barColors.length]};"></div></div>
+      <div class="b-val">${w} waiting</div>
+    </div>`;
+  }).join("");
+  document.getElementById("ov-bars").innerHTML = barsHtml;
+
+  // trend line (synthetic downward trend as adoption increases, ending near current avgWait)
+  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Today"];
+  const base = 210; // minutes, baseline walk-in wait
+  const vals = [205,188,160,140,110,80, Math.max(avgWait,35)];
+  const svg = document.getElementById("ov-trend");
+  const W=480,H=150,pad=28;
+  const maxV = base;
+  const pts = vals.map((v,i)=>{
+    const x = pad + i*((W-2*pad)/(vals.length-1));
+    const y = H-pad - (v/maxV)*(H-2*pad);
+    return [x,y];
+  });
+  let path = "M "+pts.map(p=>p.join(",")).join(" L ");
+  let svgHtml = `<line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#E6DFC9" stroke-width="1"/>`;
+  svgHtml += `<path d="${path}" fill="none" stroke="#C1592F" stroke-width="2.5"/>`;
+  pts.forEach((p,i)=>{
+    svgHtml += `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#C1592F"/>`;
+    svgHtml += `<text x="${p[0]}" y="${H-8}" font-size="10" fill="#5C584E" text-anchor="middle" font-family="Noto Sans">${days[i]}</text>`;
+  });
+  svg.innerHTML = svgHtml;
+}
+
+// ---------------------------------------------------------------
+// RENDER ALL
+// ---------------------------------------------------------------
+function renderAll(){
+  renderFarmer();
+  renderAdmin();
+  renderKiosk();
+  renderOversight();
+}
+renderAll();
+
+})();
+</script>
+</body>
+</html>
