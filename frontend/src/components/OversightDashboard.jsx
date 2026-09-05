@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { translations } from '../i18n';
 import { 
   BarChart3, TrendingDown, Clock, ShieldCheck, AlertCircle, 
-  Phone, MessageSquare, Smartphone, Monitor, Banknote, ArrowRight, CheckCircle2 
+  Phone, MessageSquare, Smartphone, Monitor, Banknote, ArrowRight, CheckCircle2,
+  ArrowUpRight, ArrowDownRight, Target
 } from 'lucide-react';
 
 export default function OversightDashboard({ lang }) {
@@ -33,160 +35,235 @@ export default function OversightDashboard({ lang }) {
 
   const barColors = ["#C1592F", "#C68A2E", "#43613B", "#6b4f8a"];
 
-  // 7-day Trend Data (Minutes)
+  // 7-day Trend Data
   const trendDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"];
   const trendValues = [210, 185, 155, 130, 95, 65, stats?.avg_wait_min ? Math.max(stats.avg_wait_min, 35) : 38];
   
-  // Generate SVG Path
-  const W = 480, H = 140, pad = 28;
-  const maxV = 220;
+  const W = 480, H = 160, pad = 32;
+  const maxV = 230;
   const points = trendValues.map((v, i) => {
     const x = pad + i * ((W - 2 * pad) / (trendValues.length - 1));
     const y = H - pad - (v / maxV) * (H - 2 * pad);
     return [x, y];
   });
   const pathString = "M " + points.map(p => p.join(",")).join(" L ");
+  // Area fill path
+  const areaPath = pathString + ` L ${points[points.length-1][0]},${H - pad} L ${points[0][0]},${H - pad} Z`;
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i) => ({
+      opacity: 1, y: 0,
+      transition: { delay: i * 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }
+    })
+  };
+
+  const statCards = [
+    {
+      value: stats ? stats.total_bookings : '—',
+      label: t.ovTotalBookings,
+      change: '↑ 14%',
+      changeCls: 'text-[#43613B]',
+      valueCls: 'text-[#2B2A25]'
+    },
+    {
+      value: stats ? `${stats.avg_wait_min} min` : '38 min',
+      label: t.ovAvgWait,
+      badge: t.ovWaitReduction,
+      badgeCls: 'bg-[#E1EADD] text-[#43613B]',
+      valueCls: 'text-[#C1592F]'
+    },
+    {
+      value: stats ? `${stats.noshow_pct}%` : '4%',
+      label: t.ovNoShow,
+      sublabel: 'Target < 8%',
+      valueCls: 'text-[#2B2A25]'
+    },
+    {
+      value: stats ? `${stats.paid_pct}%` : '88%',
+      label: t.ovPaidToday,
+      sublabel: 'Aadhaar DBT',
+      valueCls: 'text-[#43613B]'
+    }
+  ];
 
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Dashboard Headline */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-[#F3E5C6] text-[#8a6018] px-2.5 py-0.5 rounded-full border border-[#C68A2E]/30">
+      <motion.div 
+        initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-gradient-to-r from-[#F3E5C6] to-[#F5E1D5] text-[#8a6018] px-2.5 py-0.5 rounded-full border border-[#C68A2E]/20 shadow-sm">
             Govt. of India · SIH26032
           </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-[#2B2A25] mt-1.5">
+        <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-[#2B2A25] leading-tight">
           {t.ovTitle}
         </h1>
         <p className="text-xs sm:text-sm text-[#5C584E] mt-1">
           {t.ovSub}
         </p>
-      </div>
+      </motion.div>
 
       {/* Top 4 Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Bookings */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E6DFC9] shadow-sm">
-          <div className="text-3xl font-mono font-extrabold text-[#2B2A25]">
-            {stats ? stats.total_bookings : '—'}
-          </div>
-          <div className="text-xs text-[#5C584E] mt-1 font-medium">{t.ovTotalBookings}</div>
-          <div className="mt-3 text-[11px] text-[#43613B] font-bold flex items-center gap-1">
-            <span>↑ 14% vs yesterday</span>
-          </div>
-        </div>
-
-        {/* Avg Wait Time */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E6DFC9] shadow-sm">
-          <div className="text-3xl font-mono font-extrabold text-[#C1592F]">
-            {stats ? `${stats.avg_wait_min} min` : '38 min'}
-          </div>
-          <div className="text-xs text-[#5C584E] mt-1 font-medium">{t.ovAvgWait}</div>
-          <div className="mt-3 inline-block px-2 py-0.5 rounded-full bg-[#E1EADD] text-[#43613B] text-[11px] font-bold">
-            {t.ovWaitReduction}
-          </div>
-        </div>
-
-        {/* No-Show Rate */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E6DFC9] shadow-sm">
-          <div className="text-3xl font-mono font-extrabold text-[#2B2A25]">
-            {stats ? `${stats.noshow_pct}%` : '4%'}
-          </div>
-          <div className="text-xs text-[#5C584E] mt-1 font-medium">{t.ovNoShow}</div>
-          <div className="mt-3 text-[11px] text-[#43613B] font-bold">
-            Target &lt; 8% (Optimized Quota)
-          </div>
-        </div>
-
-        {/* DBT Paid */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E6DFC9] shadow-sm">
-          <div className="text-3xl font-mono font-extrabold text-[#43613B]">
-            {stats ? `${stats.paid_pct}%` : '88%'}
-          </div>
-          <div className="text-xs text-[#5C584E] mt-1 font-medium">{t.ovPaidToday}</div>
-          <div className="mt-3 text-[11px] text-[#5C584E] font-medium font-mono">
-            Direct Aadhaar DBT Credit
-          </div>
-        </div>
+        {statCards.map((card, i) => (
+          <motion.div
+            key={i}
+            custom={i}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="bg-white p-5 rounded-2xl border border-[#E6DFC9] shadow-sm hover:shadow-md transition-shadow duration-300 group"
+          >
+            <div className={`text-3xl font-mono font-extrabold ${card.valueCls} group-hover:scale-[1.02] transition-transform origin-left`}>
+              {card.value}
+            </div>
+            <div className="text-xs text-[#5C584E] mt-1 font-medium">{card.label}</div>
+            {card.change && (
+              <div className={`mt-3 text-[11px] font-bold flex items-center gap-1 ${card.changeCls}`}>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>{card.change} vs yesterday</span>
+              </div>
+            )}
+            {card.badge && (
+              <div className={`mt-3 inline-block px-2 py-0.5 rounded-full text-[11px] font-bold ${card.badgeCls}`}>
+                {card.badge}
+              </div>
+            )}
+            {card.sublabel && (
+              <div className="mt-3 text-[11px] text-[#5C584E] font-medium font-mono">
+                {card.sublabel}
+              </div>
+            )}
+          </motion.div>
+        ))}
       </div>
 
-      {/* Center Row: Live Congestion Bars & 7-Day Trend SVG */}
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Congestion Bars */}
-        <div className="bg-white p-6 rounded-3xl border border-[#E6DFC9] shadow-sm">
-          <h3 className="text-sm font-bold text-[#2B2A25] mb-4">{t.ovCongestionTitle}</h3>
+        <motion.div 
+          className="bg-white p-6 rounded-3xl border border-[#E6DFC9] shadow-sm"
+          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <h3 className="text-sm font-bold text-[#2B2A25] mb-4 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#C1592F]" />
+            {t.ovCongestionTitle}
+          </h3>
           
           <div className="space-y-4">
             {stats?.centres ? (
               stats.centres.map((c, idx) => {
                 const pct = Math.min((c.waiting / c.slot_capacity) * 100, 100);
                 return (
-                  <div key={c.id}>
+                  <motion.div 
+                    key={c.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + idx * 0.1 }}
+                  >
                     <div className="flex justify-between text-xs font-semibold text-[#2B2A25] mb-1.5">
                       <span>{c.name}</span>
-                      <span className="font-mono text-[#5C584E]">{c.waiting} waiting</span>
+                      <span className="font-mono text-[#5C584E]">{c.waiting}/{c.slot_capacity}</span>
                     </div>
-                    <div className="w-full h-2.5 bg-[#FAF6EC] rounded-full overflow-hidden border border-[#E6DFC9]">
-                      <div 
-                        className="h-full rounded-full transition-all duration-500" 
-                        style={{ 
-                          width: `${Math.max(pct, 4)}%`, 
-                          backgroundColor: barColors[idx % barColors.length] 
-                        }}
+                    <div className="w-full h-3 bg-[#FAF6EC] rounded-full overflow-hidden border border-[#E6DFC9]">
+                      <motion.div 
+                        className="h-full rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.max(pct, 4)}%` }}
+                        transition={{ duration: 0.8, delay: 0.5 + idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                        style={{ backgroundColor: barColors[idx % barColors.length] }}
                       />
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })
             ) : (
               <div className="text-xs text-[#5C584E]">Loading yard load metrics...</div>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        {/* 7-Day Wait Time Reduction Trend SVG */}
-        <div className="bg-white p-6 rounded-3xl border border-[#E6DFC9] shadow-sm">
-          <div className="flex justify-between items-baseline mb-2">
-            <h3 className="text-sm font-bold text-[#2B2A25]">{t.ovTrendTitle}</h3>
-            <span className="text-[11px] font-mono text-[#43613B] font-bold">Unmanaged → MandiFlow</span>
+        {/* 7-Day Trend SVG */}
+        <motion.div 
+          className="bg-white p-6 rounded-3xl border border-[#E6DFC9] shadow-sm"
+          initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <div className="flex justify-between items-baseline mb-3">
+            <h3 className="text-sm font-bold text-[#2B2A25] flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-[#43613B]" />
+              {t.ovTrendTitle}
+            </h3>
+            <span className="text-[10px] font-mono text-[#43613B] font-bold bg-[#E1EADD] px-2 py-0.5 rounded-full">
+              -82% reduction
+            </span>
           </div>
           
           <div className="w-full">
-            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36">
-              {/* Horizontal grid lines */}
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40">
+              {/* Grid lines */}
               <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#E6DFC9" strokeWidth="1" />
-              <line x1={pad} y1={pad} x2={W - pad} y2={pad} stroke="#E6DFC9" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1={pad} y1={pad + 20} x2={W - pad} y2={pad + 20} stroke="#E6DFC9" strokeWidth="0.5" strokeDasharray="4 4" />
+              <line x1={pad} y1={(H - pad + pad + 20) / 2} x2={W - pad} y2={(H - pad + pad + 20) / 2} stroke="#E6DFC9" strokeWidth="0.5" strokeDasharray="4 4" />
+              
+              {/* Gradient fill under curve */}
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#C1592F" stopOpacity="0.15"/>
+                  <stop offset="100%" stopColor="#C1592F" stopOpacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d={areaPath} fill="url(#areaGrad)" />
               
               {/* Trend line */}
-              <path d={pathString} fill="none" stroke="#C1592F" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={pathString} fill="none" stroke="#C1592F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               
               {/* Data points & labels */}
               {points.map((pt, i) => (
                 <g key={i}>
-                  <circle cx={pt[0]} cy={pt[1]} r="4" fill="#C1592F" stroke="#FFFFFF" strokeWidth="1.5" />
-                  <text x={pt[0]} y={H - 8} fontSize="10" fill="#5C584E" textAnchor="middle" fontFamily="Space Mono">
+                  <circle cx={pt[0]} cy={pt[1]} r="4.5" fill="#C1592F" stroke="#FFFFFF" strokeWidth="2" />
+                  <text x={pt[0]} y={pt[1] - 10} fontSize="9" fill="#5C584E" textAnchor="middle" fontFamily="Space Mono" fontWeight="bold">
+                    {trendValues[i]}m
+                  </text>
+                  <text x={pt[0]} y={H - 10} fontSize="9" fill="#5C584E" textAnchor="middle" fontFamily="Space Mono">
                     {trendDays[i]}
                   </text>
                 </g>
               ))}
             </svg>
           </div>
-          <p className="text-[11px] text-[#5C584E] mt-2">
-            Average wait time steadily declined from 210 mins down to ~38 mins as slot booking replaced unmanaged walk-in arrivals.
+          <p className="text-[11px] text-[#5C584E] mt-2 leading-relaxed">
+            Average wait time declined from <strong className="text-[#A63D3D]">210 mins</strong> to <strong className="text-[#43613B]">~38 mins</strong> as slot booking replaced unmanaged walk-in arrivals.
           </p>
-        </div>
-
+        </motion.div>
       </div>
 
-      {/* Structural Before vs. After Comparison */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E6DFC9] shadow-sm">
-        <h3 className="text-base font-bold text-[#2B2A25] mb-4">{t.ovBeforeAfter}</h3>
+      {/* Before vs. After */}
+      <motion.div 
+        className="bg-white p-6 sm:p-8 rounded-3xl border border-[#E6DFC9] shadow-sm"
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+      >
+        <h3 className="text-base font-bold text-[#2B2A25] mb-5 flex items-center gap-2">
+          <Target className="w-5 h-5 text-[#C68A2E]" />
+          {t.ovBeforeAfter}
+        </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-5 rounded-2xl bg-[#F3DEDA] border border-[#A63D3D]/20">
-            <div className="text-[11px] font-mono font-bold text-[#A63D3D] uppercase tracking-wider mb-1">
+          <motion.div 
+            className="p-5 rounded-2xl bg-gradient-to-br from-[#F3DEDA] to-[#F3DEDA]/60 border border-[#A63D3D]/15 relative overflow-hidden"
+            whileHover={{ scale: 1.01 }}
+          >
+            <div className="absolute top-3 right-3">
+              <ArrowDownRight className="w-6 h-6 text-[#A63D3D]/20" />
+            </div>
+            <div className="text-[10px] font-mono font-bold text-[#A63D3D] uppercase tracking-wider mb-1">
               {t.ovBeforeH}
             </div>
             <div className="text-3xl font-mono font-extrabold text-[#A63D3D] my-2">
@@ -195,10 +272,16 @@ export default function OversightDashboard({ lang }) {
             <p className="text-xs text-[#5C584E] leading-relaxed">
               {t.ovBeforeDesc}
             </p>
-          </div>
+          </motion.div>
 
-          <div className="p-5 rounded-2xl bg-[#E1EADD] border border-[#43613B]/20">
-            <div className="text-[11px] font-mono font-bold text-[#43613B] uppercase tracking-wider mb-1">
+          <motion.div 
+            className="p-5 rounded-2xl bg-gradient-to-br from-[#E1EADD] to-[#E1EADD]/60 border border-[#43613B]/15 relative overflow-hidden"
+            whileHover={{ scale: 1.01 }}
+          >
+            <div className="absolute top-3 right-3">
+              <ArrowUpRight className="w-6 h-6 text-[#43613B]/20" />
+            </div>
+            <div className="text-[10px] font-mono font-bold text-[#43613B] uppercase tracking-wider mb-1">
               {t.ovAfterH}
             </div>
             <div className="text-3xl font-mono font-extrabold text-[#43613B] my-2">
@@ -207,65 +290,53 @@ export default function OversightDashboard({ lang }) {
             <p className="text-xs text-[#5C584E] leading-relaxed">
               {t.ovAfterDesc}
             </p>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Omnichannel Process Showcase (App -> Web -> SMS -> IVR -> WhatsApp -> Kiosk -> DBT) */}
-      <div className="bg-[#2B2A25] text-white p-6 sm:p-8 rounded-3xl border border-[#5C584E]/30 shadow-md">
-        <div className="flex justify-between items-start flex-wrap gap-2 mb-6">
+      {/* Omnichannel Architecture */}
+      <motion.div 
+        className="bg-gradient-to-br from-[#2B2A25] via-[#1E1D19] to-[#141310] text-white p-6 sm:p-8 rounded-3xl border border-[#3D3A33] shadow-xl relative overflow-hidden grain-overlay"
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+      >
+        <div className="absolute top-0 right-0 w-48 h-48 bg-[#C68A2E]/5 rounded-full blur-3xl" />
+        
+        <div className="relative z-10 flex justify-between items-start flex-wrap gap-2 mb-6">
           <div>
             <h3 className="text-base font-bold text-[#FAF6EC]">
-              Unified Omnichannel Architecture (Part 5 Differentiator)
+              Unified Omnichannel Architecture
             </h3>
             <p className="text-xs text-[#D9D4C6] mt-0.5">
               Every access method synchronizes to the same central procurement ledger
             </p>
           </div>
-          <span className="text-[11px] font-mono text-[#C68A2E] bg-white/10 px-3 py-1 rounded-full border border-white/15">
-            100% Shared Backend Sync
+          <span className="text-[10px] font-mono text-[#C68A2E] bg-white/8 px-3 py-1.5 rounded-full border border-white/10 shadow-sm">
+            100% Shared Backend
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <Phone className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">1. Keypad IVR</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Feature phones</div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <Smartphone className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">2. Web / App</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Smartphones</div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <MessageSquare className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">3. SMS & WhatsApp</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Instant alerts</div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <ShieldCheck className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">4. QR Gate Pass</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Fast-track entry</div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <Monitor className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">5. Yard Kiosk</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Big screen TV</div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <Banknote className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
-            <div className="text-xs font-bold text-white">6. Aadhaar DBT</div>
-            <div className="text-[10px] text-[#D9D4C6] mt-0.5">Direct payout</div>
-          </div>
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center stagger-children">
+          {[
+            { Icon: Phone, title: '1. Keypad IVR', sub: 'Feature phones' },
+            { Icon: Smartphone, title: '2. Web / App', sub: 'Smartphones' },
+            { Icon: MessageSquare, title: '3. SMS & WhatsApp', sub: 'Instant alerts' },
+            { Icon: ShieldCheck, title: '4. QR Gate Pass', sub: 'Fast-track entry' },
+            { Icon: Monitor, title: '5. Yard Kiosk', sub: 'Big screen TV' },
+            { Icon: Banknote, title: '6. Aadhaar DBT', sub: 'Direct payout' },
+          ].map(({ Icon, title, sub }, i) => (
+            <motion.div 
+              key={i}
+              whileHover={{ y: -3, scale: 1.03 }}
+              className="p-3.5 rounded-2xl bg-white/5 border border-white/8 hover:bg-white/10 transition-all cursor-default"
+            >
+              <Icon className="w-5 h-5 text-[#C68A2E] mx-auto mb-1.5" />
+              <div className="text-[10px] font-bold text-white">{title}</div>
+              <div className="text-[9px] text-[#D9D4C6] mt-0.5">{sub}</div>
+            </motion.div>
+          ))}
         </div>
-      </div>
-
+      </motion.div>
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../i18n';
 import { 
   Phone, PhoneCall, PhoneOff, Volume2, VolumeX, CheckCircle, 
-  ArrowRight, ShieldCheck, Sparkles, Smartphone, Layers, AlertCircle 
+  Sparkles, Zap
 } from 'lucide-react';
 
 // Standard DTMF Dual-Tone Frequencies (Hz)
@@ -20,15 +21,15 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
   const [currentStep, setCurrentStep] = useState('welcome');
   const [ivrLang, setIvrLang] = useState('hi');
   const [centreId, setCentreId] = useState('sitapur');
-  const [lcdText, setLcdText] = useState('DIAL TO START (1800-889-2026)');
+  const [lcdText, setLcdText] = useState('DIAL TO START');
   const [audioPrompt, setAudioPrompt] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastCreatedBooking, setLastCreatedBooking] = useState(null);
   const [activeOptions, setActiveOptions] = useState([]);
+  const [pressedKey, setPressedKey] = useState(null);
   
   const audioCtxRef = useRef(null);
 
-  // Initialize Web Audio Context on user gesture
   const playDTMF = (digit) => {
     if (!soundEnabled) return;
     try {
@@ -37,34 +38,25 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
       }
       const ctx = audioCtxRef.current;
       if (ctx.state === 'suspended') ctx.resume();
-
       const freqs = DTMF_FREQS[digit];
       if (!freqs) return;
-
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       const gain = ctx.createGain();
-
       osc1.frequency.value = freqs[0];
       osc2.frequency.value = freqs[1];
-
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
-
       osc1.connect(gain);
       osc2.connect(gain);
       gain.connect(ctx.destination);
-
       osc1.start();
       osc2.start();
       osc1.stop(ctx.currentTime + 0.16);
       osc2.stop(ctx.currentTime + 0.16);
-    } catch (e) {
-      console.warn('Audio tone play failed:', e);
-    }
+    } catch (e) { /* silent */ }
   };
 
-  // Browser SpeechSynthesis text-to-speech
   const speakPrompt = (text, languageCode) => {
     if (!soundEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -82,11 +74,7 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
       const res = await fetch('/api/ivr/simulator/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          step: 'welcome',
-          digit: null,
-          lang: 'hi'
-        })
+        body: JSON.stringify({ step: 'welcome', digit: null, lang: 'hi' })
       });
       if (res.ok) {
         const data = await res.json();
@@ -111,40 +99,31 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
 
   const handleKeyPress = async (digit) => {
     playDTMF(digit);
+    setPressedKey(digit);
+    setTimeout(() => setPressedKey(null), 150);
     if (!callActive) return;
 
     try {
       const res = await fetch('/api/ivr/simulator/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          step: currentStep,
-          digit: digit,
-          lang: ivrLang,
-          centre_id: centreId
-        })
+        body: JSON.stringify({ step: currentStep, digit, lang: ivrLang, centre_id: centreId })
       });
-
       if (res.ok) {
         const data = await res.json();
         setCurrentStep(data.step);
         if (data.lang) setIvrLang(data.lang);
         if (data.centre_id) setCentreId(data.centre_id);
-        
         setLcdText(data.audio_text);
         setAudioPrompt(data.audio_text);
         setActiveOptions(data.options || []);
         speakPrompt(data.audio_text, data.lang || ivrLang);
-
         if (data.booking) {
           setLastCreatedBooking(data.booking);
           if (onIVRBookingCreated) onIVRBookingCreated(data.booking);
         }
-
         if (data.call_ended) {
-          setTimeout(() => {
-            setCallActive(false);
-          }, 7000);
+          setTimeout(() => setCallActive(false), 7000);
         }
       }
     } catch (err) {
@@ -152,227 +131,253 @@ export default function IVRKeypadSimulator({ lang, onIVRBookingCreated }) {
     }
   };
 
+  const keypadKeys = [
+    { k: '1', s: '' }, { k: '2', s: 'ABC' }, { k: '3', s: 'DEF' },
+    { k: '4', s: 'GHI' }, { k: '5', s: 'JKL' }, { k: '6', s: 'MNO' },
+    { k: '7', s: 'PQRS' }, { k: '8', s: 'TUV' }, { k: '9', s: 'WXYZ' },
+    { k: '*', s: '' }, { k: '0', s: '+' }, { k: '#', s: '' },
+  ];
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Section Headline */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider bg-[#C1592F] text-white px-2.5 py-0.5 rounded-full">
-            Headline Differentiator (Part 3)
+      <motion.div 
+        initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider bg-gradient-to-r from-[#C1592F] to-[#9A431F] text-white px-2.5 py-0.5 rounded-full shadow-sm">
+            Headline Differentiator
           </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-[#2B2A25] mt-1.5">
+        <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-[#2B2A25] leading-tight">
           {t.ivrTitle}
         </h1>
         <p className="text-xs sm:text-sm text-[#5C584E] mt-1">
           {t.ivrSub}
         </p>
-      </div>
+      </motion.div>
 
-      {/* Toll-Free Banner Card */}
-      <div className="bg-[#2B2A25] text-white p-6 rounded-3xl border border-[#5C584E]/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-md">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#C1592F] flex items-center justify-center flex-none text-white shadow-sm">
+      {/* Toll-Free Banner */}
+      <motion.div 
+        className="bg-gradient-to-r from-[#2B2A25] via-[#1E1D19] to-[#2B2A25] text-white p-6 rounded-3xl border border-[#3D3A33] flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden grain-overlay"
+        initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
+      >
+        <div className="absolute top-0 left-0 w-32 h-32 bg-[#C1592F]/10 rounded-full blur-3xl" />
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#C1592F] to-[#9A431F] flex items-center justify-center flex-none text-white shadow-lg">
             <Phone className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs font-mono text-[#C68A2E] font-bold uppercase tracking-wider">
+            <div className="text-[10px] font-mono text-[#C68A2E] font-bold uppercase tracking-widest">
               {t.tollFreeNumber}
             </div>
-            <div className="text-2xl sm:text-3xl font-mono font-bold text-white mt-0.5">
+            <div className="text-2xl sm:text-3xl font-mono font-bold text-white mt-0.5 tracking-tight">
               1800-889-2026
             </div>
-            <div className="text-xs text-[#D9D4C6] mt-0.5">
-              Zero-data requirement · Standard telephone network · Instant SMS confirmation
+            <div className="text-[10px] text-[#D9D4C6] mt-0.5">
+              Zero-data · Telephone network · SMS confirmation
             </div>
           </div>
         </div>
 
         <button
           onClick={() => setSoundEnabled(!soundEnabled)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs text-[#D9D4C6] font-mono border border-white/20 cursor-pointer"
+          className="relative z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/8 hover:bg-white/15 text-xs text-[#D9D4C6] font-mono border border-white/10 cursor-pointer transition-all active:scale-95"
         >
           {soundEnabled ? <Volume2 className="w-4 h-4 text-[#C68A2E]" /> : <VolumeX className="w-4 h-4 text-[#A63D3D]" />}
-          <span>Audio: {soundEnabled ? 'ON' : 'OFF'}</span>
+          <span>{soundEnabled ? 'ON' : 'OFF'}</span>
         </button>
-      </div>
+      </motion.div>
 
-      {/* Two Column Layout: Left Keypad Phone Simulator + Right Flowchart */}
+      {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Left 5 Cols: Physical Keypad Simulator Widget */}
-        <div className="lg:col-span-5 flex justify-center">
-          <div className="w-full max-w-sm bg-[#1E1D19] rounded-[40px] p-6 shadow-2xl border-4 border-[#3D3A33] text-white">
+        {/* Left: Keypad Simulator */}
+        <motion.div 
+          className="lg:col-span-5 flex justify-center"
+          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <div className="w-full max-w-[320px] bg-gradient-to-b from-[#1E1D19] to-[#141310] rounded-[44px] p-5 shadow-2xl border border-[#3D3A33]/50 relative">
             
-            {/* Phone Top Speaker Earpiece */}
-            <div className="w-16 h-1.5 bg-[#3D3A33] rounded-full mx-auto mb-5" />
+            {/* Earpiece */}
+            <div className="w-14 h-1.5 bg-[#3D3A33] rounded-full mx-auto mb-4 shadow-inner" />
 
-            {/* Backlit LCD Screen */}
-            <div className="bg-[#2D3325] text-[#9EE86F] p-4 rounded-2xl border-2 border-[#1E2519] shadow-inner font-mono text-xs min-h-[140px] flex flex-col justify-between">
-              <div className="flex justify-between items-center text-[10px] text-[#78B554] border-b border-[#3E4A35] pb-1">
-                <span>{callActive ? 'LINE 1: CONNECTED' : 'READY'}</span>
-                <span>{ivrLang.toUpperCase()} · DTMF</span>
+            {/* LCD Screen */}
+            <div className="bg-[#1a2612] text-[#9EE86F] p-4 rounded-2xl border border-[#253219] shadow-inner font-mono text-[10px] min-h-[130px] flex flex-col justify-between relative overflow-hidden">
+              {/* Scanline effect */}
+              <div className="absolute inset-0 pointer-events-none" 
+                style={{ 
+                  background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px)',
+                  zIndex: 1
+                }} 
+              />
+              
+              <div className="flex justify-between items-center text-[9px] text-[#5C8A3F] border-b border-[#2E4020] pb-1 relative z-10">
+                <span>{callActive ? '● LINE 1 ACTIVE' : '○ READY'}</span>
+                <span>{ivrLang.toUpperCase()}</span>
               </div>
               
-              <div className="my-2 leading-relaxed text-[11px] break-words">
-                {lcdText}
-              </div>
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key={lcdText}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="my-2 leading-relaxed text-[10px] break-words relative z-10"
+                >
+                  {lcdText}
+                </motion.div>
+              </AnimatePresence>
 
-              <div className="text-[10px] text-[#78B554] pt-1 border-t border-[#3E4A35] flex justify-between">
-                <span>MandiFlow Voice v1.0</span>
-                <span>{callActive ? '00:42' : 'STANDBY'}</span>
+              <div className="text-[9px] text-[#5C8A3F] pt-1 border-t border-[#2E4020] flex justify-between relative z-10">
+                <span>MandiFlow v1.0</span>
+                <span>{callActive ? '●REC' : 'IDLE'}</span>
               </div>
             </div>
 
-            {/* Active Keypad Options Hint */}
-            {activeOptions.length > 0 && (
-              <div className="my-3 px-3 py-2 bg-white/5 rounded-xl border border-white/10 text-[11px] text-[#D9D4C6] space-y-1 font-mono">
-                {activeOptions.map((opt) => (
-                  <div key={opt.key} className="flex items-center justify-between">
-                    <span className="text-[#C68A2E] font-bold">Press [{opt.key}]:</span>
-                    <span>{opt.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Options Hint */}
+            <AnimatePresence>
+              {activeOptions.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  className="my-3 px-3 py-2 bg-white/5 rounded-xl border border-white/8 text-[10px] text-[#D9D4C6] space-y-0.5 font-mono overflow-hidden"
+                >
+                  {activeOptions.map((opt) => (
+                    <div key={opt.key} className="flex items-center justify-between">
+                      <span className="text-[#C68A2E] font-bold">[{opt.key}]</span>
+                      <span className="text-right">{opt.label}</span>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Call Control Buttons (Green & Red) */}
-            <div className="grid grid-cols-2 gap-3 my-4">
-              <button
+            {/* Call Controls */}
+            <div className="grid grid-cols-2 gap-2.5 my-3">
+              <motion.button
                 onClick={startCall}
                 disabled={callActive}
-                className="py-3 rounded-2xl bg-[#43613B] hover:bg-[#344d2d] disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                whileTap={{ scale: 0.95 }}
+                className="py-3 rounded-2xl bg-gradient-to-b from-[#4a7340] to-[#344d2d] hover:from-[#5a8350] hover:to-[#3d5936] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-[#5C8A3F]/30"
               >
-                <PhoneCall className="w-4 h-4" />
+                <PhoneCall className="w-3.5 h-3.5" />
                 <span>{t.startCall}</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 onClick={endCall}
                 disabled={!callActive}
-                className="py-3 rounded-2xl bg-[#A63D3D] hover:bg-[#852f2f] disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                whileTap={{ scale: 0.95 }}
+                className="py-3 rounded-2xl bg-gradient-to-b from-[#b34040] to-[#852f2f] hover:from-[#c04545] hover:to-[#963434] disabled:opacity-25 disabled:cursor-not-allowed text-white font-bold text-[10px] flex items-center justify-center gap-1.5 cursor-pointer shadow-lg border border-[#c05050]/30"
               >
-                <PhoneOff className="w-4 h-4" />
+                <PhoneOff className="w-3.5 h-3.5" />
                 <span>{t.endCall}</span>
-              </button>
+              </motion.button>
             </div>
 
-            {/* Dial Keypad 3x4 Matrix */}
-            <div className="grid grid-cols-3 gap-2.5 pt-2">
-              {[
-                { k: '1', s: '.,' }, { k: '2', s: 'ABC' }, { k: '3', s: 'DEF' },
-                { k: '4', s: 'GHI' }, { k: '5', s: 'JKL' }, { k: '6', s: 'MNO' },
-                { k: '7', s: 'PQRS' }, { k: '8', s: 'TUV' }, { k: '9', s: 'WXYZ' },
-                { k: '*', s: 'REPEAT' }, { k: '0', s: '+' }, { k: '#', s: 'CONFIRM' },
-              ].map(({ k, s }) => (
-                <button
+            {/* Dial Keypad */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {keypadKeys.map(({ k, s }) => (
+                <motion.button
                   key={k}
                   onClick={() => handleKeyPress(k)}
-                  className="h-14 rounded-2xl bg-[#2B2A25] hover:bg-[#383730] active:scale-95 text-white border border-[#3D3A33] shadow-md transition flex flex-col items-center justify-center cursor-pointer"
+                  whileTap={{ scale: 0.9 }}
+                  className={`h-[52px] rounded-2xl border transition-all flex flex-col items-center justify-center cursor-pointer ${
+                    pressedKey === k 
+                      ? 'bg-[#C1592F] border-[#C1592F] text-white shadow-lg shadow-[#C1592F]/20' 
+                      : 'bg-[#2B2A25] hover:bg-[#383730] border-[#3D3A33] text-white shadow-md'
+                  }`}
                 >
                   <span className="font-mono text-base font-bold leading-tight text-[#FAF6EC]">{k}</span>
-                  <span className="text-[9px] text-[#A6A295] font-mono leading-none tracking-wider">{s}</span>
-                </button>
+                  {s && <span className="text-[8px] text-[#A6A295] font-mono leading-none tracking-wider">{s}</span>}
+                </motion.button>
               ))}
             </div>
 
-            {/* Shared Backend Booking Created Banner */}
-            {lastCreatedBooking && (
-              <div className="mt-4 p-3 bg-[#E1EADD] rounded-2xl border border-[#43613B] text-center text-xs text-[#2B2A25]">
-                <div className="font-bold text-[#43613B] flex items-center justify-center gap-1">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Token Created via Phone Call!</span>
-                </div>
-                <div className="font-mono text-base font-bold text-[#2B2A25] mt-1">
-                  Token #{String(lastCreatedBooking.token).padStart(3, '0')}
-                </div>
-                <div className="text-[10px] text-[#5C584E] mt-0.5">
-                  Now visible live in the Admin Procurement Queue
-                </div>
-              </div>
-            )}
+            {/* Booking Created Banner */}
+            <AnimatePresence>
+              {lastCreatedBooking && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="mt-3 p-3 bg-gradient-to-r from-[#E1EADD] to-[#d4e3cd] rounded-2xl border border-[#43613B]/30 text-center text-[10px] text-[#2B2A25]"
+                >
+                  <div className="font-bold text-[#43613B] flex items-center justify-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Token Created via IVR!</span>
+                  </div>
+                  <div className="font-mono text-base font-bold text-[#2B2A25] mt-0.5">
+                    #{String(lastCreatedBooking.token).padStart(3, '0')}
+                  </div>
+                  <div className="text-[9px] text-[#5C584E] mt-0.5">
+                    Live in Admin Queue now
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </div>
-        </div>
+        </motion.div>
 
-        {/* Right 7 Cols: Call-Flow Diagram & Judge Verification */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Right: Call-Flow + Proof */}
+        <motion.div 
+          className="lg:col-span-7 space-y-6"
+          initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E6DFC9] shadow-sm">
-            <h2 className="text-base font-bold text-[#2B2A25] mb-2">{t.callFlowSteps}</h2>
-            <p className="text-xs text-[#5C584E] mb-6">
-              Complete DTMF voice decision tree handling language selection, multi-centre booking, queue lookup, and human staff fallback.
+            <h2 className="text-base font-bold text-[#2B2A25] mb-2 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-[#C68A2E]" />
+              {t.callFlowSteps}
+            </h2>
+            <p className="text-xs text-[#5C584E] mb-5">
+              Complete DTMF voice decision tree — language, centre, booking, queue lookup, and staff fallback.
             </p>
 
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#C1592F] text-white flex items-center justify-center text-xs font-mono font-bold flex-none">
-                  1
+            <div className="space-y-3 stagger-children">
+              {[
+                { num: 1, color: '#C1592F', h: t.step1H, d: t.step1D },
+                { num: 2, color: '#2B2A25', h: t.step2H, d: t.step2D },
+                { num: 3, color: '#2B2A25', h: t.step3H, d: t.step3D },
+                { num: 4, color: '#43613B', h: t.step4H, d: t.step4D },
+                { num: 5, color: '#C68A2E', h: t.step5H, d: t.step5D },
+              ].map((step) => (
+                <div key={step.num} className="p-3.5 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3 hover:border-[#C1592F]/30 transition-colors">
+                  <div 
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-mono font-bold flex-none text-white shadow-sm"
+                    style={{ backgroundColor: step.color }}
+                  >
+                    {step.num}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-[#2B2A25]">{step.h}</div>
+                    <div className="text-[10px] text-[#5C584E] mt-0.5 leading-relaxed">{step.d}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-[#2B2A25]">{t.step1H}</div>
-                  <div className="text-xs text-[#5C584E] mt-0.5">{t.step1D}</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#2B2A25] text-white flex items-center justify-center text-xs font-mono font-bold flex-none">
-                  2
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[#2B2A25]">{t.step2H}</div>
-                  <div className="text-xs text-[#5C584E] mt-0.5">{t.step2D}</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#2B2A25] text-white flex items-center justify-center text-xs font-mono font-bold flex-none">
-                  3
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[#2B2A25]">{t.step3H}</div>
-                  <div className="text-xs text-[#5C584E] mt-0.5">{t.step3D}</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#43613B] text-white flex items-center justify-center text-xs font-mono font-bold flex-none">
-                  4
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[#2B2A25]">{t.step4H}</div>
-                  <div className="text-xs text-[#5C584E] mt-0.5">{t.step4D}</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#FAF6EC] border border-[#E6DFC9] flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#A63D3D] text-white flex items-center justify-center text-xs font-mono font-bold flex-none">
-                  5
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[#2B2A25]">{t.step5H}</div>
-                  <div className="text-xs text-[#5C584E] mt-0.5">{t.step5D}</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Technical Credibility Proof Point Card */}
-          <div className="bg-[#FAF6EC] p-6 rounded-3xl border border-[#C68A2E]/40 shadow-sm">
+          {/* Proof Point */}
+          <div className="bg-gradient-to-r from-[#FAF6EC] to-[#F3E5C6]/50 p-5 rounded-3xl border border-[#C68A2E]/25 shadow-sm">
             <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-[#C68A2E] flex-none mt-0.5" />
+              <div className="w-8 h-8 rounded-xl bg-[#C68A2E]/10 flex items-center justify-center flex-none">
+                <Sparkles className="w-4 h-4 text-[#C68A2E]" />
+              </div>
               <div>
-                <h3 className="text-xs font-bold text-[#2B2A25] uppercase tracking-wider">
-                  Shared Backend Proof for Hackathon Evaluators
+                <h3 className="text-[11px] font-bold text-[#2B2A25] uppercase tracking-wider">
+                  Shared Backend Proof for Evaluators
                 </h3>
-                <p className="text-xs text-[#5C584E] mt-1 leading-relaxed">
-                  Notice that an IVR phone call booking does not run on mock data. It directly calls the FastAPI endpoint, issues a token via SQLite atomic transaction, and fires a WebSocket event so the <strong>Procurement Desk (Admin)</strong> and <strong>Gate Kiosk TV</strong> immediately update in real-time without page reload.
+                <p className="text-[10px] text-[#5C584E] mt-1 leading-relaxed">
+                  An IVR phone call booking directly hits the FastAPI endpoint, issues a token via SQLite atomic transaction, and fires a WebSocket event — the <strong>Admin Queue</strong> and <strong>Gate Kiosk TV</strong> update in real-time without reload.
                 </p>
               </div>
             </div>
           </div>
 
-        </div>
-
+        </motion.div>
       </div>
     </div>
   );
