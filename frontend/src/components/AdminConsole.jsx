@@ -6,12 +6,14 @@ import {
   Scale, Banknote, Search, Star, Smartphone, Phone, Sparkles, RefreshCw,
   Printer, Volume2, Radio, Building2, FileText, Check, ShieldCheck, Fingerprint
 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function AdminConsole({ 
   centres, 
   slots, 
   lang, 
   bookings, 
+  soundEnabled = true,
   onCallNext, 
   onUpdateBooking, 
   onStaffBooking 
@@ -43,7 +45,15 @@ export default function AdminConsole({
   });
 
   const audioCtxRef = useRef(null);
+  const isSpeakingRef = useRef(false);
   const [paBanner, setPaBanner] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [highlightedBookingId, setHighlightedBookingId] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3800);
+  };
 
   const currentCentre = centres.find(c => c.id === selectedCentreId) || centres[0];
   const centreBookings = bookings.filter(b => b.centre_id === selectedCentreId);
@@ -79,6 +89,7 @@ export default function AdminConsole({
     });
 
   const playMandiChime = () => {
+    if (!soundEnabled) return;
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -113,11 +124,18 @@ export default function AdminConsole({
 
   // Play loudspeaker PA announcement in Hindi & English
   const triggerLoudspeakerPA = (tokenNumber, farmerName, bay = 2) => {
+    setPaBanner({ 
+      textHi: `📢 टोकन #${tokenNumber} (${farmerName || 'किसान'}): कृपया तुलाई व ग्रेडिंग के लिए बे ${bay} पर पहुंचे` 
+    });
+
+    if (!soundEnabled) {
+      setTimeout(() => setPaBanner(null), 6000);
+      return;
+    }
+
     playMandiChime();
     const announcementEn = `Attention please! Token number ${tokenNumber}, ${farmerName || 'Farmer'}, please proceed to Bay ${bay} for produce inspection and grading.`;
     const announcementHi = `ध्यान दें! टोकन नंबर ${tokenNumber}, ${farmerName || 'किसान भाई'}, कृपया तुलाई और ग्रेडिंग के लिए बे नंबर ${bay} पर पहुंचे।`;
-    
-    setPaAnnouncement(`📢 टोकन ${tokenNumber} (${farmerName || 'किसान'}): बे ${bay} पर पहुंचे`);
     
     if (window.speechSynthesis && !isSpeakingRef.current) {
       isSpeakingRef.current = true;
@@ -136,10 +154,12 @@ export default function AdminConsole({
       };
       utterEn.onend = () => {
         isSpeakingRef.current = false;
-        setTimeout(() => setPaAnnouncement(''), 7000);
+        setTimeout(() => setPaBanner(null), 6000);
       };
       
       window.speechSynthesis.speak(utterHi);
+    } else {
+      setTimeout(() => setPaBanner(null), 6000);
     }
   };
 
@@ -147,6 +167,9 @@ export default function AdminConsole({
     if (onCallNext) {
       const calledBooking = await onCallNext(centreId);
       if (calledBooking) {
+        setHighlightedBookingId(calledBooking.id);
+        setTimeout(() => setHighlightedBookingId(null), 3000);
+        showToast(`Token #${calledBooking.token} (${calledBooking.farmer_name}) called to Bay 2`);
         triggerLoudspeakerPA(calledBooking.token, calledBooking.farmer_name, 2);
       }
     }
@@ -185,6 +208,7 @@ export default function AdminConsole({
           priority: false 
         });
         if (onStaffBooking) onStaffBooking();
+        showToast(`Token #${newBooking.token} issued for ${newBooking.farmer_name}`);
         
         // Open thermal slip modal immediately for instant print!
         const centreObj = centres.find(c => c.id === selectedCentreId) || { name: 'Sitapur Krishi Mandi' };
@@ -218,8 +242,10 @@ export default function AdminConsole({
         })
       });
       if (res.ok) {
+        const gradedToken = gradingModal.token;
         setGradingModal(null);
         if (onUpdateBooking) onUpdateBooking();
+        showToast(`Token #${gradedToken} graded & queued for DBT payout`);
       }
     } catch (err) {
       console.error('Grading error:', err);
@@ -233,7 +259,10 @@ export default function AdminConsole({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ booking_id: bookingId })
       });
-      if (res.ok && onUpdateBooking) onUpdateBooking();
+      if (res.ok) {
+        if (onUpdateBooking) onUpdateBooking();
+        showToast(`Direct DBT payout released to farmer account!`);
+      }
     } catch (err) {
       console.error('Disburse error:', err);
     }
@@ -247,6 +276,7 @@ export default function AdminConsole({
         body: JSON.stringify({ priority: booking.priority ? 0 : 1 })
       });
       if (onUpdateBooking) onUpdateBooking();
+      showToast(`Priority status toggled for #${booking.token}`);
     } catch (err) {
       console.error('Priority update error:', err);
     }
@@ -411,7 +441,7 @@ export default function AdminConsole({
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => handleCallNextWithPA(selectedCentreId)}
+                onClick={() => handleCallNextClick(selectedCentreId)}
                 disabled={waitingList.length === 0}
                 className="w-full py-3.5 bg-gradient-to-r from-[#C1592F] to-[#9A431F] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer border border-[#C1592F]/40"
               >
@@ -539,7 +569,14 @@ export default function AdminConsole({
                     const isStaff = b.booking_channel === 'staff_assisted';
 
                     return (
-                      <tr key={b.id} className={`hover:bg-[#FAF6EC]/60 transition ${isCalled ? 'bg-[#F5E1D5]/40 font-medium' : ''}`}>
+                      <tr 
+                        key={b.id} 
+                        className={`transition-colors duration-300 ${
+                          highlightedBookingId === b.id 
+                            ? 'row-called-highlight font-medium' 
+                            : (isCalled ? 'bg-[#F5E1D5]/40 font-medium' : 'hover:bg-[#FAF6EC]/60')
+                        }`}
+                      >
                         <td className="py-3 font-mono font-bold text-[#2B2A25]">
                           <span className={`px-2 py-0.5 rounded-lg border ${
                             isCalled 
@@ -650,6 +687,7 @@ export default function AdminConsole({
                                       body: JSON.stringify({ status: 'no-show' })
                                     });
                                     if (onUpdateBooking) onUpdateBooking();
+                                    showToast(`Token #${b.token} marked as No-Show`, 'warning');
                                   }}
                                   className="px-2 py-1 rounded-lg text-[#A63D3D] hover:bg-[#F3DEDA] text-[11px] font-bold cursor-pointer transition"
                                 >
@@ -673,12 +711,15 @@ export default function AdminConsole({
                             {!isCalled && !isServed && (
                               <button
                                 onClick={async () => {
+                                  setHighlightedBookingId(b.id);
+                                  setTimeout(() => setHighlightedBookingId(null), 3000);
                                   await fetch(`${API_BASE_URL}/api/bookings/${b.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ status: 'called' })
                                   });
                                   if (onUpdateBooking) onUpdateBooking();
+                                  showToast(`Token #${b.token} (${b.farmer_name}) called to Bay 2`);
                                   triggerLoudspeakerPA(b.token, b.farmer_name, 2);
                                 }}
                                 className="px-2.5 py-1 rounded-lg bg-white border border-[#E6DFC9] hover:border-[#2B2A25] hover:bg-[#FAF6EC] text-[11px] font-bold text-[#2B2A25] cursor-pointer transition shadow-2xs"
@@ -1008,6 +1049,29 @@ export default function AdminConsole({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Action Confirmation Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-bold text-white toast-appear ${
+              toast.type === 'warning'
+                ? 'bg-[#A63D3D] border-[#A63D3D]/50'
+                : 'bg-[#2B2A25] border-[#C68A2E]/50'
+            }`}
+          >
+            {toast.type === 'warning' ? (
+              <AlertTriangle className="w-4 h-4 text-amber-300 flex-none" />
+            ) : (
+              <CheckCircle className="w-4 h-4 text-emerald-400 flex-none" />
+            )}
+            <span>{toast.message}</span>
+          </motion.div>
         )}
       </AnimatePresence>
 
