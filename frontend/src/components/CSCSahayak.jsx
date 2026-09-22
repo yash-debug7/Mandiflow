@@ -125,9 +125,15 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
     }, 1200);
   };
 
+  const [cscError, setCscError] = useState('');
+
   const handleSubmitNoPhoneBooking = async (e) => {
     e.preventDefault();
-    if (!farmerName.trim()) return;
+    setCscError('');
+    if (!farmerName.trim()) {
+      setCscError('Please enter farmer name');
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/staff-booking`, {
@@ -137,8 +143,8 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
           centre_id: selectedCentreId,
           crop: crop,
           slot_id: selectedSlotId,
-          farmer_name: farmerName,
-          farmer_phone: govIdNumber ? `ID: ${govIdNumber}` : 'Offline-CSC',
+          farmer_name: farmerName.trim(),
+          farmer_phone: govIdNumber.trim() ? `ID: ${govIdNumber.trim()}` : 'Offline-CSC',
           priority: priority ? 1 : 0
         })
       });
@@ -153,7 +159,7 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
           centre_name: centreObj.name,
           slot_label: slotObj.label,
           id_type: idType,
-          id_number: govIdNumber || 'Aadhaar Verified',
+          id_number: govIdNumber.trim() || 'Aadhaar Verified',
           bay: selectedCentreId === 'sitapur' || selectedCentreId === 'karnal' ? 'Bay 2 (Shed C)' : 'Bay 1 (Shed A)',
           issued_at: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
         };
@@ -165,9 +171,13 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
         setFarmerName('');
         setGovIdNumber('');
         setBiometricVerified(false);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setCscError(errData.detail || 'Failed to issue token. Please check entries.');
       }
     } catch (err) {
       console.error('Offline booking error:', err);
+      setCscError('Network connection error.');
     }
   };
 
@@ -286,6 +296,11 @@ export default function CSCSahayak({ centres, slots, lang, bookings, onBookingCr
             </div>
 
             <form onSubmit={handleSubmitNoPhoneBooking} className="space-y-4">
+              {cscError && (
+                <div className="p-2.5 rounded-xl bg-[#F3DEDA] text-[#A63D3D] text-xs font-bold border border-[#A63D3D]/30" role="alert">
+                  ⚠️ {cscError}
+                </div>
+              )}
               
               {/* ID Verification Mode Selector */}
               <div>
