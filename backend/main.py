@@ -156,6 +156,11 @@ async def create_booking(b: BookingCreate):
         )
         result = dict(booking[0])
         await broadcast("booking_created", result)
+
+        if b.farmer_phone:
+            msg = f"MandiFlow: Booking Confirmed! Token #{token:03d} for {b.crop} at {b.centre_id.title()} Mandi (Slot {b.slot_id.upper()}). Gate pass active."
+            await dispatch_omnichannel(b.farmer_phone, msg, result["id"])
+
         return result
     finally:
         await db.close()
