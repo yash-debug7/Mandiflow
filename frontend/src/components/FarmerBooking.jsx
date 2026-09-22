@@ -29,6 +29,7 @@ export default function FarmerBooking({
 
   const [showQR, setShowQR] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState('');
   const [feedback, setFeedback] = useState({ rating: 5, wait: 5, comments: '', submitted: false });
 
   // Intelligent Load-Balancing
@@ -44,8 +45,13 @@ export default function FarmerBooking({
 
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
+    setBookingError('');
     if (!draft.farmer_name.trim()) {
-      alert(lang === 'en' ? 'Please enter farmer name' : 'कृपया किसान का नाम दर्ज करें');
+      setBookingError(lang === 'en' ? 'Please enter a valid farmer name.' : 'कृपया मान्य किसान का नाम दर्ज करें।');
+      return;
+    }
+    if (draft.farmer_phone && draft.farmer_phone.replace(/\D/g, '').length > 0 && draft.farmer_phone.replace(/\D/g, '').length < 10) {
+      setBookingError(lang === 'en' ? 'Please enter a valid 10-digit mobile number.' : 'कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।');
       return;
     }
     setSubmitting(true);
@@ -55,7 +61,7 @@ export default function FarmerBooking({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           centre_id: draft.centre_id, crop: draft.crop, slot_id: draft.slot_id,
-          farmer_name: draft.farmer_name, farmer_phone: draft.farmer_phone,
+          farmer_name: draft.farmer_name.trim(), farmer_phone: draft.farmer_phone.trim(),
           priority: draft.priority ? 1 : 0, channel: 'web'
         })
       });
@@ -63,9 +69,13 @@ export default function FarmerBooking({
         const created = await res.json();
         setMyBooking(created);
         if (onBookingComplete) onBookingComplete(created);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setBookingError(errData.detail || (lang === 'en' ? 'Booking failed. Please try again.' : 'बुकिंग विफल रही। कृपया पुनः प्रयास करें।'));
       }
     } catch (err) {
       console.error('Booking failed:', err);
+      setBookingError(lang === 'en' ? 'Network error. Please check your connection.' : 'नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।');
     } finally {
       setSubmitting(false);
     }
@@ -183,7 +193,7 @@ export default function FarmerBooking({
                     draft={draft} setDraft={setDraft}
                     centres={centres} slots={slots} bookings={bookings}
                     currentCentre={currentCentre} alternativeCentre={alternativeCentre}
-                    submitting={submitting} handleBookingSubmit={handleBookingSubmit}
+                    submitting={submitting} bookingError={bookingError} handleBookingSubmit={handleBookingSubmit}
                     t={t} lang={lang}
                   />
                 )}
@@ -460,18 +470,31 @@ function TrackerView({ myBooking, centres, slots, bookings, notifications, setSh
 }
 
 /* ═══════ BOOKING FORM ═══════ */
-function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre, alternativeCentre, submitting, handleBookingSubmit, t, lang }) {
+function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre, alternativeCentre, submitting, bookingError, handleBookingSubmit, t, lang }) {
   return (
     <motion.form 
       onSubmit={handleBookingSubmit} 
       className="space-y-3.5"
       initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.4 }}
+      aria-label="Farmer Procurement Booking Form"
     >
       <div className="text-left">
         <div className="text-base font-extrabold text-[#2B2A25] tracking-tight">{t.appTitle}</div>
         <div className="text-[10px] text-[#5C584E] mt-0.5">{t.tagline}</div>
       </div>
+
+      {/* Error Alert */}
+      {bookingError && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+          className="p-2.5 rounded-xl bg-[#F3DEDA] text-[#A63D3D] border border-[#A63D3D]/30 text-[10px] font-bold"
+          role="alert"
+          aria-live="assertive"
+        >
+          ⚠️ {bookingError}
+        </motion.div>
+      )}
 
       {/* 1. Choose Centre */}
       <div>
@@ -622,14 +645,18 @@ function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre,
         type="submit"
         disabled={submitting || !draft.farmer_name.trim()}
         whileTap={{ scale: 0.97 }}
+        aria-label="Confirm Booking and Generate Token"
         className={`w-full py-3 rounded-xl font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1.5 mt-1 ${
-          draft.farmer_name.trim() 
+          draft.farmer_name.trim() && !submitting
             ? 'bg-gradient-to-r from-[#C1592F] to-[#9A431F] hover:from-[#9A431F] hover:to-[#C1592F] text-white shadow-lg shadow-[#C1592F]/20' 
             : 'bg-[#D8D2C2] text-[#5C584E] cursor-not-allowed'
         }`}
       >
-        <span>{submitting ? 'Generating Token...' : t.confirmBooking}</span>
-        <ArrowRight className="w-3.5 h-3.5" />
+        {submitting && (
+          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+        )}
+        <span>{submitting ? (lang === 'en' ? 'Generating Token...' : 'टोकन जारी हो रहा है...') : t.confirmBooking}</span>
+        {!submitting && <ArrowRight className="w-3.5 h-3.5" />}
       </motion.button>
     </motion.form>
   );

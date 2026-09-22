@@ -18,8 +18,28 @@ export default function App() {
   const [slots, setSlots] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [myBooking, setMyBooking] = useState(null);
+  const [myBooking, setMyBooking] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mandiflow_my_booking');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [wsConnected, setWsConnected] = useState(false);
+
+  // Sync myBooking to localStorage
+  useEffect(() => {
+    try {
+      if (myBooking) {
+        localStorage.setItem('mandiflow_my_booking', JSON.stringify(myBooking));
+      } else {
+        localStorage.removeItem('mandiflow_my_booking');
+      }
+    } catch (e) {
+      console.warn('LocalStorage save failed:', e);
+    }
+  }, [myBooking]);
 
   const socketRef = useRef(null);
   const t = translations[lang];
@@ -42,7 +62,15 @@ export default function App() {
 
       if (cRes.ok) setCentres(await cRes.json());
       if (sRes.ok) setSlots(await sRes.json());
-      if (bRes.ok) setBookings(await bRes.json());
+      if (bRes.ok) {
+        const fetchedBookings = await bRes.json();
+        setBookings(fetchedBookings);
+        // Sync myBooking with updated database status if persisted
+        if (myBooking) {
+          const fresh = fetchedBookings.find((b) => b.id === myBooking.id);
+          if (fresh) setMyBooking(fresh);
+        }
+      }
       if (nRes.ok) setNotifications(await nRes.json());
     } catch (err) {
       console.error('Error loading initial data:', err);

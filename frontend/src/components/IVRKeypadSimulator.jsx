@@ -152,9 +152,13 @@ export default function IVRKeypadSimulator({
             setDigitBuffer('');
           }, 7000);
         }
+      } else {
+        setLcdText('Invalid selection. Please try again.');
+        speakPrompt('Invalid selection. Please try again.', ivrLang);
       }
     } catch (err) {
       console.error('IVR digit error:', err);
+      setLcdText('Connection error on call.');
     }
   };
 

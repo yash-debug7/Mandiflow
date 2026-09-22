@@ -177,11 +177,14 @@ export default function AdminConsole({
 
   const handleWalkInSubmit = async (e) => {
     e.preventDefault();
-    if (!walkInDraft.farmer_name.trim()) return;
+    if (!walkInDraft.farmer_name.trim()) {
+      showToast('Please enter a valid farmer name', 'warning');
+      return;
+    }
     try {
-      const phoneOrId = walkInDraft.id_number 
-        ? `${walkInDraft.id_type.toUpperCase()}: ${walkInDraft.id_number}` 
-        : (walkInDraft.farmer_phone || 'Walk-In No-Phone');
+      const phoneOrId = walkInDraft.id_number.trim()
+        ? `${walkInDraft.id_type.toUpperCase()}: ${walkInDraft.id_number.trim()}`
+        : (walkInDraft.farmer_phone.trim() || 'Walk-In No-Phone');
 
       const res = await fetch(`${API_BASE_URL}/api/admin/staff-booking`, {
         method: 'POST',
@@ -190,7 +193,7 @@ export default function AdminConsole({
           centre_id: selectedCentreId,
           crop: walkInDraft.crop,
           slot_id: walkInDraft.slot_id,
-          farmer_name: walkInDraft.farmer_name,
+          farmer_name: walkInDraft.farmer_name.trim(),
           farmer_phone: phoneOrId,
           priority: walkInDraft.priority ? 1 : 0
         })
@@ -220,25 +223,44 @@ export default function AdminConsole({
           bay: 'Bay 2 (Shed C)',
           issued_at: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
         });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.detail || 'Failed to issue walk-in token', 'warning');
       }
     } catch (err) {
       console.error('Walk-in booking error:', err);
+      showToast('Network error on walk-in booking', 'warning');
     }
   };
 
   const handleGradingSubmit = async (e) => {
     e.preventDefault();
     if (!gradingModal) return;
+    const qty = parseFloat(gradeDraft.qty_kg);
+    const msp = parseFloat(gradeDraft.msp_rate);
+    const moisture = parseFloat(gradeDraft.moisture_pct);
+    if (isNaN(qty) || qty <= 0) {
+      showToast('Please enter a valid produce quantity in kg (> 0)', 'warning');
+      return;
+    }
+    if (isNaN(msp) || msp <= 0) {
+      showToast('Please enter a valid MSP rate (> 0)', 'warning');
+      return;
+    }
+    if (isNaN(moisture) || moisture < 0 || moisture > 100) {
+      showToast('Please enter a valid moisture percentage (0 - 100)', 'warning');
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE_URL}/api/procurement/grade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           booking_id: gradingModal.id,
-          qty_kg: parseFloat(gradeDraft.qty_kg),
-          moisture_pct: parseFloat(gradeDraft.moisture_pct),
+          qty_kg: qty,
+          moisture_pct: moisture,
           grade: gradeDraft.grade,
-          msp_rate: parseFloat(gradeDraft.msp_rate)
+          msp_rate: msp
         })
       });
       if (res.ok) {
@@ -246,9 +268,13 @@ export default function AdminConsole({
         setGradingModal(null);
         if (onUpdateBooking) onUpdateBooking();
         showToast(`Token #${gradedToken} graded & queued for DBT payout`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.detail || 'Failed to submit grading', 'warning');
       }
     } catch (err) {
       console.error('Grading error:', err);
+      showToast('Network error submitting grading', 'warning');
     }
   };
 

@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from database import get_db, init_db, next_token
 from ivr import router as ivr_router
@@ -57,43 +57,59 @@ app.include_router(ivr_router)
 # ═══════════════════════════════════════
 
 class BookingCreate(BaseModel):
-    centre_id: str
-    crop: str
-    slot_id: str
-    farmer_name: str
+    centre_id: str = Field(..., min_length=1, description="Centre ID")
+    crop: str = Field(..., min_length=1, description="Crop name")
+    slot_id: str = Field(..., min_length=1, description="Slot ID")
+    farmer_name: str = Field(..., min_length=2, max_length=100, description="Farmer full name")
     farmer_phone: str = ""
-    priority: int = 0
+    priority: int = Field(0, ge=0, le=1)
     channel: str = "web"
+
+    @field_validator('farmer_name', 'centre_id', 'crop', 'slot_id')
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        v_stripped = v.strip()
+        if not v_stripped:
+            raise ValueError("Field cannot be empty or whitespace only")
+        return v_stripped
 
 
 class BookingUpdate(BaseModel):
     status: Optional[str] = None
-    priority: Optional[int] = None
-    qty_kg: Optional[float] = None
-    moisture_pct: Optional[float] = None
+    priority: Optional[int] = Field(None, ge=0, le=1)
+    qty_kg: Optional[float] = Field(None, gt=0)
+    moisture_pct: Optional[float] = Field(None, ge=0, le=100)
     grade: Optional[str] = None
-    msp_rate: Optional[float] = None
-    payment_amount: Optional[float] = None
+    msp_rate: Optional[float] = Field(None, gt=0)
+    payment_amount: Optional[float] = Field(None, ge=0)
     payment_status: Optional[str] = None
     payment_utr: Optional[str] = None
 
 
 class StaffBookingCreate(BaseModel):
     """Admin staff-assisted walk-in registration."""
-    centre_id: str
-    crop: str
-    slot_id: str
-    farmer_name: str
+    centre_id: str = Field(..., min_length=1)
+    crop: str = Field(..., min_length=1)
+    slot_id: str = Field(..., min_length=1)
+    farmer_name: str = Field(..., min_length=2, max_length=100)
     farmer_phone: str = ""
-    priority: int = 0
+    priority: int = Field(0, ge=0, le=1)
+
+    @field_validator('farmer_name', 'centre_id', 'crop', 'slot_id')
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        v_stripped = v.strip()
+        if not v_stripped:
+            raise ValueError("Field cannot be empty or whitespace only")
+        return v_stripped
 
 
 class ProcurementGradeRequest(BaseModel):
     booking_id: int
-    qty_kg: float
-    moisture_pct: float = 12.0
-    grade: str = "A"
-    msp_rate: float = 24.25 # Rs per kg (e.g. Wheat MSP ~Rs 2425/quintal)
+    qty_kg: float = Field(..., gt=0, description="Quantity in kg must be > 0")
+    moisture_pct: float = Field(12.0, ge=0, le=100)
+    grade: str = Field("A", min_length=1)
+    msp_rate: float = Field(24.25, gt=0) # Rs per kg (e.g. Wheat MSP ~Rs 2425/quintal)
 
 
 class PaymentDisburseRequest(BaseModel):
@@ -103,8 +119,8 @@ class PaymentDisburseRequest(BaseModel):
 
 class FeedbackCreate(BaseModel):
     booking_id: Optional[int] = None
-    rating: int = 5
-    wait_satisfaction: int = 5
+    rating: int = Field(5, ge=1, le=5)
+    wait_satisfaction: int = Field(5, ge=1, le=5)
     comments: Optional[str] = None
 
 
@@ -140,6 +156,13 @@ async def list_slots():
 async def create_booking(b: BookingCreate):
     db = await get_db()
     try:
+        c_check = await db.execute_fetchall("SELECT id FROM centres WHERE id=?", (b.centre_id,))
+        if not c_check:
+            raise HTTPException(400, f"Invalid centre_id: {b.centre_id}")
+        s_check = await db.execute_fetchall("SELECT id FROM slots WHERE id=?", (b.slot_id,))
+        if not s_check:
+            raise HTTPException(400, f"Invalid slot_id: {b.slot_id}")
+
         token = await next_token(b.centre_id)
         await db.execute(
             """INSERT INTO bookings
@@ -458,6 +481,13 @@ async def staff_booking(sb: StaffBookingCreate):
     """Register walk-in farmers on the spot from the procurement desk."""
     db = await get_db()
     try:
+        c_check = await db.execute_fetchall("SELECT id FROM centres WHERE id=?", (sb.centre_id,))
+        if not c_check:
+            raise HTTPException(400, f"Invalid centre_id: {sb.centre_id}")
+        s_check = await db.execute_fetchall("SELECT id FROM slots WHERE id=?", (sb.slot_id,))
+        if not s_check:
+            raise HTTPException(400, f"Invalid slot_id: {sb.slot_id}")
+
         tok = await next_token(sb.centre_id)
         await db.execute(
             """INSERT INTO bookings
