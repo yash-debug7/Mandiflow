@@ -31,6 +31,40 @@ export default function FarmerBooking({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState({ rating: 5, wait: 5, comments: '', submitted: false });
 
+  // Lookup mode for existing token
+  const [lookupToken, setLookupToken] = useState('');
+  const [lookupError, setLookupError] = useState('');
+  const [isLookupMode, setIsLookupMode] = useState(false);
+
+  const fillQuickDemo = () => {
+    setDraft({
+      centre_id: 'sitapur',
+      crop: 'Wheat',
+      slot_id: 's2',
+      farmer_name: 'Ramesh Yadav',
+      farmer_phone: '+91 98765 43210',
+      priority: false
+    });
+  };
+
+  const handleLookupSubmit = (e) => {
+    e.preventDefault();
+    setLookupError('');
+    const cleanToken = parseInt(lookupToken.replace(/\D/g, ''), 10);
+    if (!cleanToken) {
+      setLookupError(lang === 'en' ? 'Please enter a valid token number' : 'कृपया वैध टोकन नंबर दर्ज करें');
+      return;
+    }
+    const found = bookings.find(b => b.token === cleanToken);
+    if (found) {
+      setMyBooking(found);
+      setIsLookupMode(false);
+      setLookupToken('');
+    } else {
+      setLookupError(lang === 'en' ? `Token #${cleanToken} not found in database` : `टोकन #${cleanToken} नहीं मिला`);
+    }
+  };
+
   // Intelligent Load-Balancing
   const currentCentre = centres.find(c => c.id === draft.centre_id);
   const centreWaitingCount = bookings.filter(b => b.centre_id === draft.centre_id && b.status === 'waiting').length;
@@ -167,27 +201,113 @@ export default function FarmerBooking({
 
             {/* Screen Content Wrapper */}
             <div className="p-4 pt-10 flex-1 overflow-y-auto">
-              <AnimatePresence mode="wait">
-                {myBooking ? (
-                  <TrackerView 
-                    key="tracker"
-                    myBooking={myBooking} centres={centres} slots={slots} bookings={bookings}
-                    notifications={notifications} setShowQR={setShowQR} setMyBooking={setMyBooking}
-                    feedback={feedback} setFeedback={setFeedback}
-                    handleFeedbackSubmit={handleFeedbackSubmit}
-                    t={t} lang={lang}
+        {/* Toggle Mode Banner: Book vs Look Up Token */}
+        <div className="flex items-center justify-between bg-[#FAF6EC] p-1 rounded-xl border border-[#E6DFC9] mb-3 text-[10px] font-bold">
+          <button
+            type="button"
+            onClick={() => { setIsLookupMode(false); setLookupError(''); }}
+            className={`flex-1 py-1 rounded-lg transition ${!isLookupMode ? 'bg-[#2B2A25] text-white shadow-xs' : 'text-[#5C584E]'}`}
+          >
+            {lang === 'en' ? 'Book Slot' : 'स्लॉट बुक करें'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsLookupMode(true)}
+            className={`flex-1 py-1 rounded-lg transition ${isLookupMode ? 'bg-[#2B2A25] text-white shadow-xs' : 'text-[#5C584E]'}`}
+          >
+            {lang === 'en' ? 'Track Token #' : 'टोकन ट्रैक करें'}
+          </button>
+        </div>
+
+        {/* Loading Skeleton */}
+        {centres.length === 0 ? (
+          <div className="space-y-3 py-6 animate-pulse">
+            <div className="h-6 bg-[#E6DFC9] rounded-lg w-3/4" />
+            <div className="h-16 bg-[#E6DFC9] rounded-2xl w-full" />
+            <div className="h-16 bg-[#E6DFC9] rounded-2xl w-full" />
+            <div className="h-10 bg-[#E6DFC9] rounded-xl w-full" />
+            <div className="text-[10px] text-center text-[#5C584E]">Connecting to MandiFlow Backend...</div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {myBooking ? (
+              <TrackerView
+                key="tracker"
+                myBooking={myBooking} centres={centres} slots={slots} bookings={bookings}
+                notifications={notifications} setShowQR={setShowQR} setMyBooking={setMyBooking}
+                feedback={feedback} setFeedback={setFeedback}
+                handleFeedbackSubmit={handleFeedbackSubmit}
+                t={t} lang={lang}
+              />
+            ) : isLookupMode ? (
+              <motion.div
+                key="lookup"
+                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                className="space-y-3 pt-2"
+              >
+                <div className="text-left">
+                  <div className="text-sm font-extrabold text-[#2B2A25]">
+                    {lang === 'en' ? 'Track Existing Token' : 'टोकन स्थिति खोजें'}
+                  </div>
+                  <div className="text-[10px] text-[#5C584E]">
+                    {lang === 'en' ? 'Track any token issued via App, IVR call or Gate Desk' : 'ऐप, कॉल या गेट डेस्क द्वारा जारी टोकन का विवरण देखें'}
+                  </div>
+                </div>
+
+                <form onSubmit={handleLookupSubmit} className="space-y-2 pt-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder={lang === 'en' ? "Enter Token # (e.g. 15 or 42)" : "टोकन नंबर (उदा. 15)"}
+                    value={lookupToken}
+                    onChange={(e) => setLookupToken(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl border border-[#E6DFC9] bg-[#FAF6EC] outline-none focus:border-[#2B2A25] font-mono text-center font-bold text-base"
                   />
-                ) : (
-                  <BookingForm 
-                    key="form"
-                    draft={draft} setDraft={setDraft}
-                    centres={centres} slots={slots} bookings={bookings}
-                    currentCentre={currentCentre} alternativeCentre={alternativeCentre}
-                    submitting={submitting} handleBookingSubmit={handleBookingSubmit}
-                    t={t} lang={lang}
-                  />
+                  {lookupError && (
+                    <div className="text-[10px] text-[#A63D3D] font-bold text-center">{lookupError}</div>
+                  )}
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-[#2B2A25] text-white rounded-xl text-xs font-bold cursor-pointer hover:bg-black transition"
+                  >
+                    {lang === 'en' ? 'Search Live Tracker' : 'कतार स्थिति खोजें'}
+                  </button>
+                </form>
+
+                {/* Quick token suggestions from active list */}
+                {bookings.length > 0 && (
+                  <div className="pt-3 border-t border-[#E6DFC9]">
+                    <div className="text-[9px] text-[#5C584E] font-bold uppercase mb-1.5">
+                      {lang === 'en' ? 'Active Tokens in System:' : 'सिस्टम में सक्रिय टोकन:'}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {bookings.slice(0, 6).map(b => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => { setMyBooking(b); setIsLookupMode(false); }}
+                          className="px-2 py-1 rounded-lg bg-[#FAF6EC] border border-[#E6DFC9] text-[9px] font-mono font-bold text-[#2B2A25] hover:bg-[#2B2A25] hover:text-white transition cursor-pointer"
+                        >
+                          #{String(b.token).padStart(3, '0')} ({b.farmer_name.split(' ')[0]})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </motion.div>
+            ) : (
+              <BookingForm
+                key="form"
+                draft={draft} setDraft={setDraft}
+                centres={centres} slots={slots} bookings={bookings}
+                currentCentre={currentCentre} alternativeCentre={alternativeCentre}
+                submitting={submitting} handleBookingSubmit={handleBookingSubmit}
+                fillQuickDemo={fillQuickDemo}
+                t={t} lang={lang}
+              />
+            )}
+          </AnimatePresence>
+        )}
             </div>
 
             {/* Home Indicator */}
@@ -460,7 +580,7 @@ function TrackerView({ myBooking, centres, slots, bookings, notifications, setSh
 }
 
 /* ═══════ BOOKING FORM ═══════ */
-function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre, alternativeCentre, submitting, handleBookingSubmit, t, lang }) {
+function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre, alternativeCentre, submitting, handleBookingSubmit, fillQuickDemo, t, lang }) {
   return (
     <motion.form 
       onSubmit={handleBookingSubmit} 
@@ -468,9 +588,20 @@ function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre,
       initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="text-left">
-        <div className="text-base font-extrabold text-[#2B2A25] tracking-tight">{t.appTitle}</div>
-        <div className="text-[10px] text-[#5C584E] mt-0.5">{t.tagline}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-left">
+          <div className="text-base font-extrabold text-[#2B2A25] tracking-tight">{t.appTitle}</div>
+          <div className="text-[10px] text-[#5C584E] mt-0.5">{t.tagline}</div>
+        </div>
+        {fillQuickDemo && (
+          <button
+            type="button"
+            onClick={fillQuickDemo}
+            className="px-2.5 py-1 rounded-lg bg-[#F3E5C6] hover:bg-[#ebd9b0] text-[#8a6018] text-[9px] font-bold border border-[#C68A2E]/30 cursor-pointer transition active:scale-95 shadow-2xs"
+          >
+            ⚡ Demo Fill
+          </button>
+        )}
       </div>
 
       {/* 1. Choose Centre */}
