@@ -29,17 +29,22 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 
 
 async def log_notification_to_db(booking_id: Optional[int], channel: str, message: str):
-    """Save notification record to SQLite for in-app drawer rendering."""
+    """Save notification record to SQLite for in-app drawer rendering and return created dict."""
     try:
         db = await get_db()
-        await db.execute(
+        cursor = await db.execute(
             "INSERT INTO notifications (booking_id, channel, message) VALUES (?, ?, ?)",
             (booking_id, channel, message)
         )
         await db.commit()
+        notif_id = cursor.lastrowid
+        rows = await db.execute_fetchall("SELECT * FROM notifications WHERE id=?", (notif_id,))
         await db.close()
+        if rows:
+            return dict(rows[0])
     except Exception as e:
         logger.error(f"Failed to log notification to DB: {e}")
+    return None
 
 
 async def send_sms(phone: str, message: str, booking_id: Optional[int] = None) -> dict:
@@ -59,7 +64,8 @@ async def send_sms(phone: str, message: str, booking_id: Optional[int] = None) -
             logger.error(f"Twilio SMS send error: {e}")
             result["error"] = str(e)
     
-    await log_notification_to_db(booking_id, "sms", message)
+    notif_record = await log_notification_to_db(booking_id, "sms", message)
+    result["notif_record"] = notif_record
     return result
 
 
@@ -81,7 +87,8 @@ async def send_whatsapp(phone: str, message: str, booking_id: Optional[int] = No
             logger.error(f"Twilio WhatsApp send error: {e}")
             result["error"] = str(e)
 
-    await log_notification_to_db(booking_id, "whatsapp", message)
+    notif_record = await log_notification_to_db(booking_id, "whatsapp", message)
+    result["notif_record"] = notif_record
     return result
 
 

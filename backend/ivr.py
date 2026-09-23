@@ -290,7 +290,10 @@ async def ivr_simulator_action(act: SimulatorAction):
         
         # Send omnichannel confirmation
         sms_msg = f"MandiFlow: Token #{tok:03d} booked via Phone Call for {centre_name}, Slot {slot_label}. Show this SMS at yard gate."
-        await dispatch_omnichannel(act.caller_phone, sms_msg, created_booking["id"])
+        res = await dispatch_omnichannel(act.caller_phone, sms_msg, created_booking["id"])
+        if res and "sms" in res and res["sms"].get("notif_record"):
+            from main import broadcast
+            await broadcast("notification_created", res["sms"]["notif_record"])
 
         success_speech = IVR_VOICE_TEXT[lang]["booking_success"].format(
             token=tok,

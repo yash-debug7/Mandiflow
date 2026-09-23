@@ -8,6 +8,15 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
+const CROP_DEMO_MSP = {
+  Wheat: 24.25,
+  Paddy: 23.00,
+  Mustard: 56.50,
+  Soybean: 48.92,
+  Onion: 20.00,
+  Maize: 22.25
+};
+
 export default function AdminConsole({ 
   centres, 
   slots, 
@@ -43,6 +52,17 @@ export default function AdminConsole({
     grade: 'A',
     msp_rate: 24.25
   });
+
+  const openGradingModalForBooking = (b) => {
+    setGradingModal(b);
+    const recommendedRate = CROP_DEMO_MSP[b.crop] || 24.25;
+    setGradeDraft({
+      qty_kg: b.qty_kg || 45.0,
+      moisture_pct: b.moisture_pct || 11.5,
+      grade: b.grade || 'A',
+      msp_rate: recommendedRate
+    });
+  };
 
   const audioCtxRef = useRef(null);
   const isSpeakingRef = useRef(false);
@@ -452,7 +472,7 @@ export default function AdminConsole({
               {nowServing && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setGradingModal(nowServing)}
+                        onClick={() => openGradingModalForBooking(nowServing)}
                     className="flex-1 py-2 rounded-xl bg-[#43613B] text-white text-xs font-bold hover:bg-[#344d2d] cursor-pointer flex items-center justify-center gap-1 shadow-sm transition"
                   >
                     <Scale className="w-3.5 h-3.5" />
@@ -673,7 +693,7 @@ export default function AdminConsole({
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
-                                  onClick={() => setGradingModal(b)}
+                                  onClick={() => openGradingModalForBooking(b)}
                                   className="px-2.5 py-1 rounded-lg bg-[#43613B] text-white text-[11px] font-bold hover:bg-[#344d2d] cursor-pointer flex items-center gap-1 shadow-sm"
                                 >
                                   <Scale className="w-3 h-3" />
@@ -915,7 +935,9 @@ export default function AdminConsole({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#2B2A25] mb-1">MSP Rate (Rs / kg)</label>
+                    <label className="block text-xs font-bold text-[#2B2A25] mb-1">
+                      MSP Rate (Rs / kg) <span className="text-[10px] text-[#5C584E] font-normal">(Configured Rate)</span>
+                    </label>
                     <input
                       type="number"
                       step="0.05"

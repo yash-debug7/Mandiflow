@@ -49,6 +49,9 @@ export default function App() {
     }
   };
 
+  const reconnectTimerRef = useRef(null);
+  const backoffDelayRef = useRef(1000);
+
   useEffect(() => {
     loadInitialData();
 
@@ -56,12 +59,21 @@ export default function App() {
     const wsUrl = getWsUrl('/ws/queue');
     
     const connectWs = () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+
       try {
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
         ws.onopen = () => {
           setWsConnected(true);
+          backoffDelayRef.current = 1000;
         };
 
         ws.onmessage = (event) => {
@@ -79,6 +91,8 @@ export default function App() {
             ) {
               setBookings((prev) => prev.map((b) => (b.id === data.id ? data : b)));
               setMyBooking((cur) => (cur && cur.id === data.id ? data : cur));
+            } else if (evtType === 'notification_created') {
+              setNotifications((prev) => [data, ...prev.filter((n) => n.id !== data.id)]);
             }
           } catch (e) {
             console.error('Error parsing WS message:', e);
@@ -87,8 +101,9 @@ export default function App() {
 
         ws.onclose = () => {
           setWsConnected(false);
-          // Auto-reconnect after 3 seconds
-          setTimeout(connectWs, 3000);
+          const nextDelay = Math.min(backoffDelayRef.current * 1.5, 10000);
+          backoffDelayRef.current = nextDelay;
+          reconnectTimerRef.current = setTimeout(connectWs, nextDelay);
         };
 
         ws.onerror = () => {
@@ -113,10 +128,11 @@ export default function App() {
       } catch (e) {
         // silent
       }
-    }, 5000);
+    }, 10000);
 
     return () => {
       clearInterval(pollInterval);
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (socketRef.current) socketRef.current.close();
     };
   }, []);
