@@ -41,9 +41,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MandiFlow API", version="1.0.0", lifespan=lifespan)
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+else:
+    allowed_origins = [
+        "https://mandiflow-dvgp.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -289,7 +303,9 @@ async def call_next(centre_id: str):
         # Omnichannel notification to phone if available
         if booking.get("farmer_phone"):
             msg = f"MandiFlow ALERT: Token #{booking['token']:03d}, your turn is now! Please proceed to Weighing Bay {bay_num} immediately."
-            await dispatch_omnichannel(booking["farmer_phone"], msg, booking["id"])
+            res = await dispatch_omnichannel(booking["farmer_phone"], msg, booking["id"])
+            if res and "sms" in res and res["sms"].get("notif_record"):
+                await broadcast("notification_created", res["sms"]["notif_record"])
 
         return booking
     finally:
@@ -476,7 +492,9 @@ async def staff_booking(sb: StaffBookingCreate):
 
         if sb.farmer_phone:
             msg = f"MandiFlow: Walk-in registered! Token #{tok:03d} for {sb.centre_id.title()} Mandi, Slot {sb.slot_id.upper()}. Gate pass active."
-            await dispatch_omnichannel(sb.farmer_phone, msg, booking["id"])
+            res = await dispatch_omnichannel(sb.farmer_phone, msg, booking["id"])
+            if res and "sms" in res and res["sms"].get("notif_record"):
+                await broadcast("notification_created", res["sms"]["notif_record"])
 
         return booking
     finally:
@@ -510,7 +528,9 @@ async def grade_produce(req: ProcurementGradeRequest):
         if booking.get("farmer_phone"):
             msg = (f"MandiFlow: Produce accepted! {req.qty_kg:.1f}kg at Rs {req.msp_rate}/kg. "
                    f"Grade {req.grade} (Moisture {req.moisture_pct}%). Total payout: Rs {total_payout:,.2f}. DBT pending.")
-            await dispatch_omnichannel(booking["farmer_phone"], msg, req.booking_id)
+            res = await dispatch_omnichannel(booking["farmer_phone"], msg, req.booking_id)
+            if res and "sms" in res and res["sms"].get("notif_record"):
+                await broadcast("notification_created", res["sms"]["notif_record"])
 
         return booking
     finally:
@@ -542,7 +562,9 @@ async def disburse_payment(req: PaymentDisburseRequest):
             payout = booking.get("payment_amount") or 0
             msg = (f"MandiFlow: DBT Payment of Rs {payout:,.2f} credited to your Aadhaar-linked account. "
                    f"Bank UTR: {utr}. Thank you for selling via MSP!")
-            await dispatch_omnichannel(booking["farmer_phone"], msg, req.booking_id)
+            res = await dispatch_omnichannel(booking["farmer_phone"], msg, req.booking_id)
+            if res and "sms" in res and res["sms"].get("notif_record"):
+                await broadcast("notification_created", res["sms"]["notif_record"])
 
         return booking
     finally:
