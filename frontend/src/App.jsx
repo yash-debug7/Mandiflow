@@ -22,6 +22,9 @@ export default function App() {
   const [wsConnected, setWsConnected] = useState(false);
 
   const socketRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isUnmountedRef = useRef(false);
   const t = translations[lang];
 
   useEffect(() => {
@@ -50,18 +53,45 @@ export default function App() {
   };
 
   useEffect(() => {
+    isUnmountedRef.current = false;
     loadInitialData();
 
     // WebSocket real-time subscription
     const wsUrl = getWsUrl('/ws/queue');
     
+    const scheduleReconnect = () => {
+      if (isUnmountedRef.current || reconnectTimerRef.current) return;
+
+      const attempts = reconnectAttemptsRef.current;
+      // Exponential backoff: 1s, 2s, 4s, 8s, max 16s + jitter
+      const delay = Math.min(1000 * Math.pow(2, attempts), 16000) + Math.random() * 500;
+      reconnectAttemptsRef.current += 1;
+
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (!isUnmountedRef.current) {
+          connectWs();
+        }
+      }, delay);
+    };
+
     const connectWs = () => {
+      if (isUnmountedRef.current) return;
+      if (socketRef.current && (socketRef.current.readyState === WebSocket.CONNECTING || socketRef.current.readyState === WebSocket.OPEN)) {
+        return;
+      }
+
       try {
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
         ws.onopen = () => {
+          if (isUnmountedRef.current) {
+            ws.close();
+            return;
+          }
           setWsConnected(true);
+          reconnectAttemptsRef.current = 0;
         };
 
         ws.onmessage = (event) => {
@@ -79,6 +109,8 @@ export default function App() {
             ) {
               setBookings((prev) => prev.map((b) => (b.id === data.id ? data : b)));
               setMyBooking((cur) => (cur && cur.id === data.id ? data : cur));
+            } else if (evtType === 'notification_created') {
+              setNotifications((prev) => [data, ...prev.filter((n) => n.id !== data.id)]);
             }
           } catch (e) {
             console.error('Error parsing WS message:', e);
@@ -87,8 +119,9 @@ export default function App() {
 
         ws.onclose = () => {
           setWsConnected(false);
-          // Auto-reconnect after 3 seconds
-          setTimeout(connectWs, 3000);
+          if (!isUnmountedRef.current) {
+            scheduleReconnect();
+          }
         };
 
         ws.onerror = () => {
@@ -96,6 +129,10 @@ export default function App() {
         };
       } catch (e) {
         console.warn('WebSocket connection attempt failed:', e);
+        setWsConnected(false);
+        if (!isUnmountedRef.current) {
+          scheduleReconnect();
+        }
       }
     };
 
@@ -116,8 +153,16 @@ export default function App() {
     }, 5000);
 
     return () => {
+      isUnmountedRef.current = true;
       clearInterval(pollInterval);
-      if (socketRef.current) socketRef.current.close();
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
     };
   }, []);
 
