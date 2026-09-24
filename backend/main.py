@@ -4,6 +4,7 @@ Serves REST API, WebSocket queue sync, and Twilio IVR webhooks.
 """
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
