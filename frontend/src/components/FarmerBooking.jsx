@@ -31,6 +31,14 @@ export default function FarmerBooking({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState({ rating: 5, wait: 5, comments: '', submitted: false });
 
+  // Sync crop default when centres reference data is loaded or centre changes
+  useEffect(() => {
+    const c = centres.find(item => item.id === draft.centre_id);
+    if (c && c.default_crop && draft.crop === 'Wheat' && c.default_crop !== 'Wheat') {
+      setDraft(prev => ({ ...prev, crop: c.default_crop }));
+    }
+  }, [centres, draft.centre_id]);
+
   // Intelligent Load-Balancing
   const currentCentre = centres.find(c => c.id === draft.centre_id);
   const centreWaitingCount = bookings.filter(b => b.centre_id === draft.centre_id && b.status === 'waiting').length;
@@ -487,7 +495,7 @@ function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre,
               <motion.div
                 key={c.id}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setDraft({ ...draft, centre_id: c.id })}
+                onClick={() => setDraft({ ...draft, centre_id: c.id, crop: c.default_crop || draft.crop })}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
                   isSelected
                     ? 'border-[#C1592F] bg-[#F5E1D5]/30 shadow-sm'
@@ -524,7 +532,7 @@ function BookingForm({ draft, setDraft, centres, slots, bookings, currentCentre,
             </div>
             <button
               type="button"
-              onClick={() => setDraft({ ...draft, centre_id: alternativeCentre.id })}
+              onClick={() => setDraft({ ...draft, centre_id: alternativeCentre.id, crop: alternativeCentre.default_crop || draft.crop })}
               className="font-bold underline cursor-pointer text-[#9A431F] mt-0.5 ml-5"
             >
               {t.switchCentre} →

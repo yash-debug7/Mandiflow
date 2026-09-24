@@ -29,14 +29,24 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 
 
 async def log_notification_to_db(booking_id: Optional[int], channel: str, message: str):
-    """Save notification record to SQLite for in-app drawer rendering."""
+    """Save notification record to SQLite for in-app drawer rendering and broadcast WS event."""
     try:
         db = await get_db()
-        await db.execute(
+        cursor = await db.execute(
             "INSERT INTO notifications (booking_id, channel, message) VALUES (?, ?, ?)",
             (booking_id, channel, message)
         )
+        notif_id = cursor.lastrowid
         await db.commit()
+
+        rows = await db.execute_fetchall("SELECT * FROM notifications WHERE id=?", (notif_id,))
+        if rows:
+            notif_data = dict(rows[0])
+            try:
+                from main import broadcast
+                await broadcast("notification_created", notif_data)
+            except Exception as be:
+                logger.warning(f"Broadcast notification error: {be}")
         await db.close()
     except Exception as e:
         logger.error(f"Failed to log notification to DB: {e}")
